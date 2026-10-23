@@ -210,3 +210,28 @@ fn every_hook_message_speaks_vietnamese() {
     let missing: Vec<&str> = messages.into_iter().filter(|m| translator.find("vi", None, m).is_none()).collect();
     assert!(missing.is_empty(), "not in lang/vi.toml: {missing:?}");
 }
+
+db_test!(an_item_may_leave_out_its_position_and_tab, migrate = Migrator, |db: TestDb| async move {
+    let app = support::app(db).await;
+    let panel = admin(&app).await;
+    // The create form starts with the entity defaults (an untouched input is left out).
+    let schema = panel.get(&app.admin_api("resources/menu_items/schema")).await.assert_status(StatusCode::OK).json();
+    let default_of = |name: &str| {
+        let components = schema["form"]["components"].as_array().expect("form components");
+        components.iter().find(|c| c["name"] == name).unwrap_or_else(|| panic!("no field {name}"))["default"].clone()
+    };
+    assert_eq!((default_of("position"), default_of("new_tab")), (json!(0), json!(false)));
+
+    let menus_url = app.admin_api("resources/menus/records");
+    let primary = key(&panel.post_json(&menus_url, &json!({"key": "primary", "name": "Main"})).await.json());
+    let created = panel
+        .post_json(
+            &format!("{menus_url}/{primary}/relations/items"),
+            &json!({"label": "Giới thiệu", "kind": "url", "url": "/gioi-thieu"}),
+        )
+        .await
+        .assert_status(StatusCode::CREATED)
+        .json();
+    let item = menu_item::Entity::find_by_id(key(&created)).one(app.state().db()).await.unwrap().unwrap();
+    assert_eq!((item.position, item.new_tab), (0, false));
+});

@@ -17,7 +17,10 @@ pub struct Model {
     pub target_id: Option<i64>,
     /// The link (`kind` = `url`).
     pub url: Option<String>,
+    /// Defaults (the form may leave them out): the same tab, first.
+    #[sea_orm(default_value = false)]
     pub new_tab: bool,
+    #[sea_orm(default_value = 0)]
     pub position: i32,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,

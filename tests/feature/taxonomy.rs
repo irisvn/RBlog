@@ -177,7 +177,11 @@ db_test!(deleting_records_an_event_and_forgets_old_slugs, migrate = Migrator, |d
     assert_eq!(last.kind, "category.deleted");
     assert_eq!(
         last.payload,
-        json!({"tags": ["category:moi", "posts", "sitemap"], "paths": {"old": ["/categories/moi"], "new": []}})
+        // The old slug too: the frontend may still cache /categories/cu.
+        json!({
+            "tags": ["category:moi", "category:cu", "posts", "sitemap"],
+            "paths": {"old": ["/categories/cu", "/categories/moi"], "new": []}
+        })
     );
 
     let tags = app.admin_api("resources/tags/records");

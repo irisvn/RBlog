@@ -130,12 +130,21 @@ pub async fn saved<E: Taxonomy>(
 /// Records the outbox event of a deleted record and forgets its old slugs: they would redirect
 /// to nothing.
 pub async fn deleted<E: Taxonomy>(txn: &DatabaseTransaction, id: i64, slug: &str) -> AppResult<()> {
+    // The frontend may still cache pages under the old slugs (they redirected here): purge them too.
+    let old: Vec<String> = slug_history::Entity::find()
+        .select_only()
+        .column(slug_history::Column::OldSlug)
+        .filter(slug_history::Column::SubjectType.eq(E::SUBJECT))
+        .filter(slug_history::Column::SubjectId.eq(id))
+        .into_tuple()
+        .all(txn)
+        .await?;
     slug_history::Entity::delete_many()
         .filter(slug_history::Column::SubjectType.eq(E::SUBJECT))
         .filter(slug_history::Column::SubjectId.eq(id))
         .exec(txn)
         .await?;
-    event::<E>(txn, Change::Deleted, id, slug, &[]).await
+    event::<E>(txn, Change::Deleted, id, slug, &old).await
 }
 
 async fn event<E: Taxonomy>(
