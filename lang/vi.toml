@@ -6,3 +6,51 @@
 #
 # `rustcms lang:missing vi` lists the labels still missing. The panel's own
 # text, and the labels of the framework's resources, come with rustcms.
+
+# Settings pages (src/admin/pages/*_settings_page.rs).
+"General" = "Chung"
+"Reading" = "Đọc"
+"SEO and social" = "SEO và mạng xã hội"
+"Integrations" = "Tích hợp"
+
+"Site name" = "Tên site"
+"Site language" = "Ngôn ngữ site"
+"The language the public site is written in" = "Ngôn ngữ của nội dung trên trang công khai"
+"Vietnamese" = "Tiếng Việt"
+"English" = "Tiếng Anh"
+"Public site URL" = "URL trang công khai"
+"An https address, for example https://example.com (http only for localhost)" = "Địa chỉ https, ví dụ https://example.com (http chỉ dùng cho localhost)"
+"Posts per page" = "Số bài mỗi trang"
+"Between 1 and 100" = "Từ 1 đến 100"
+
+"Homepage shows" = "Trang chủ hiển thị"
+"Latest posts" = "Bài viết mới nhất"
+"A page" = "Một trang"
+"Page slug" = "Slug của trang"
+"The page the homepage shows, for example about" = "Trang hiển thị ở trang chủ, ví dụ about"
+
+"Default meta title" = "Tiêu đề meta mặc định"
+"Used when a page sets no meta title" = "Dùng khi trang không đặt tiêu đề meta"
+"Default meta description" = "Mô tả meta mặc định"
+"Used when a page sets no meta description" = "Dùng khi trang không đặt mô tả meta"
+"Default share image URL" = "URL ảnh chia sẻ mặc định"
+"An https address of the image shown when a page without its own is shared" = "Địa chỉ https của ảnh hiện khi chia sẻ một trang không có ảnh riêng"
+"Social links" = "Liên kết mạng xã hội"
+"Keys: facebook, x, instagram, youtube, tiktok, linkedin, github. Values: https addresses." = "Khoá: facebook, x, instagram, youtube, tiktok, linkedin, github. Giá trị: địa chỉ https."
+
+"Webhook URL" = "URL webhook"
+"An https address told about each change. Leave it empty for no webhook." = "Địa chỉ https nhận thông báo mỗi khi có thay đổi. Để trống nếu không dùng webhook."
+"Webhook secret" = "Secret của webhook"
+"Required with a webhook URL. Changing the URL clears it." = "Bắt buộc khi có URL webhook. Đổi URL sẽ xoá secret."
+"Preview path" = "Đường dẫn xem trước"
+"The public site's preview route, for example /preview" = "Đường dẫn xem trước của trang công khai, ví dụ /preview"
+
+# Validation messages of the settings pages (`ctx.t`): `lang:missing` does not list them.
+"must be an https address (http only for localhost)" = "phải là địa chỉ https (http chỉ dùng cho localhost)"
+"must be an https address" = "phải là địa chỉ https"
+"may only use the keys facebook, x, instagram, youtube, tiktok, linkedin and github" = "chỉ được dùng các khoá facebook, x, instagram, youtube, tiktok, linkedin và github"
+"must have https addresses as values" = "phải có giá trị là địa chỉ https"
+"is required when a webhook URL is set" = "không được để trống khi đã đặt URL webhook"
+"must be a path starting with /" = "phải là đường dẫn bắt đầu bằng /"
+"is required when the homepage shows a page" = "không được để trống khi trang chủ hiển thị một trang"
+"may only contain lowercase letters, digits and hyphens" = "chỉ được chứa chữ thường không dấu, chữ số và dấu gạch ngang"

@@ -4,6 +4,11 @@
 use rustcms::admin::Theme;
 use rustcms::prelude::*;
 
+use crate::settings::general_settings::GeneralSettings;
+use crate::settings::integration_settings::IntegrationSettings;
+use crate::settings::reading_settings::ReadingSettings;
+use crate::settings::seo_settings::SeoSettings;
+
 pub fn provider() -> AdminProvider {
     AdminProvider::new()
         .brand("rblog")
@@ -19,6 +24,12 @@ pub fn provider() -> AdminProvider {
         .media()
         // Labels in Vietnamese (`rustcms lang:missing vi` lists what is missing).
         .translations("vi", include_str!("../../lang/vi.toml"))
+        // Settings, in the navigation's order: the site, its homepage, search and social
+        // networks, then what connects it to the public site.
+        .settings::<GeneralSettings>()
+        .settings::<ReadingSettings>()
+        .settings::<SeoSettings>()
+        .settings::<IntegrationSettings>()
     // rustcms:resources
     // rustcms:pages
     // rustcms:extensions
