@@ -15,6 +15,9 @@ changes by a **webhook**.
 - Lists: `?page` (from 1) and `?per_page` (default 20, at most 100), answered as
   `{ "data": [...], "meta": { "page", "perPage", "total", "lastPage" } }`, newest first
   (`published_at`, then `id`).
+- Paths: RBlog names each public page of the frontend the same way everywhere (menus, sitemap,
+  webhook): `/posts/{slug}`, `/{slug}` for a page, `/categories/{slug}`, `/tags/{slug}`,
+  `/authors/{slug}`. Map them to your routes if they differ.
 - Errors: RustCMS's envelope `{ "message", "code", "errors" }` with 401, 403, 404, 422, 429.
 
 ## Endpoints
@@ -77,7 +80,7 @@ Settings → Integrations, **at least once** (retried with backoff):
     "kind": "category.updated",
     "subject": { "type": "category", "id": "12" },
     "tags": ["category:du-lich", "category:du-lich-cu", "posts", "sitemap"],
-    "paths": { "old": ["/category/du-lich-cu"], "new": ["/category/du-lich"] },
+    "paths": { "old": ["/categories/du-lich-cu"], "new": ["/categories/du-lich"] },
     "created_at": "2026-10-24T08:15:30.123456Z"
   }
   ```
@@ -90,7 +93,7 @@ Settings → Integrations, **at least once** (retried with backoff):
   - `paths.old` are public paths that no longer show this content (an old slug, a deleted
     record): purge or redirect them. `paths.new` are the paths that show it now. Both are
     always arrays, possibly empty.
-  - `created_at` is when the change committed (UTC, RFC 3339, microseconds). Deliveries can
+  - `created_at` is when the change was recorded (UTC, RFC 3339, microseconds). Deliveries can
     arrive out of order and more than once: revalidating is the safe answer to any of them.
   - New fields may be added; existing ones keep their name and meaning.
 - an event is retried for about an hour (8 attempts, 30 s apart at first, doubling). One the
@@ -107,6 +110,28 @@ Settings → Integrations, **at least once** (retried with backoff):
 - answer **2xx** within 10 seconds (5 to connect). Redirects are not followed and count as a
   failure. RBlog retries timeouts, connection errors, 408, 425, 429 and 5xx; any other answer
   (3xx, other 4xx) fails the delivery without retrying.
+
+Each event is a row of RBlog's outbox (`content_events`), written in the same transaction as
+the change (`src/services/content_sync.rs`). Its payload:
+
+```json
+{
+  "tags": ["category:du-lich", "category:du-lich-cu", "posts", "sitemap"],
+  "paths": { "old": ["/categories/du-lich-cu"], "new": ["/categories/du-lich"] }
+}
+```
+
+- `tags`: what to revalidate, without duplicates. A renamed category or tag lists its new and
+  its old slug.
+- `paths.old`: paths that no longer show the content (an old slug, a deleted record);
+  `paths.new`: the paths that show it now. Categories are `/categories/{slug}` and tags
+  `/tags/{slug}`; a menu has no path of its own (both lists empty).
+
+| Event kind | When | Tags |
+|---|---|---|
+| `category.created`, `category.updated`, `category.deleted` | a category is written | `category:{slug}` (and the old slug on a rename), `posts`, `sitemap` |
+| `tag.created`, `tag.updated`, `tag.deleted` | a tag is written | `tag:{slug}` (and the old slug on a rename), `posts`, `sitemap` |
+| `menu.created`, `menu.updated`, `menu.deleted` | a menu or one of its items is written (an item change is `menu.updated`) | `menu:{key}` |
 
 Keep a fallback time-based revalidation (for example 10 minutes) in case the webhook stays
 unreachable.

@@ -10,6 +10,7 @@ use rblog::bootstrap;
 use rblog::database::migrations::Migrator;
 use rblog::jobs::deliver_content_event::{DeliverContentEvent, NO_WEBHOOK};
 use rblog::models::content_event;
+use rblog::services::content_sync;
 use rblog::services::events::{self, WebhookConfig};
 use rblog::services::webhook::{self, verify};
 use rustcms::axum::Router;
@@ -155,6 +156,29 @@ db_test!(delivers_the_signed_body_once, migrate = Migrator, |db: TestDb| async m
     assert_eq!(run_jobs(&app).await, 1);
     assert_eq!(seen.lock().unwrap().len(), 1);
     assert_eq!(load(&app, id).await.attempts, 1);
+});
+
+db_test!(recording_an_event_dispatches_its_delivery, migrate = Migrator, |db: TestDb| async move {
+    let app = app(db).await;
+    let db = app.state().db();
+    let payload = json!({ "tags": ["settings"], "paths": { "old": [], "new": [] } });
+
+    let txn = rustcms::db::begin_write(db).await.unwrap();
+    content_sync::record_event(&txn, "settings.updated", "settings", None, payload.clone()).await.unwrap();
+    txn.commit().await.unwrap();
+    let recorded = content_event::Entity::find().all(db).await.unwrap();
+    assert_eq!(recorded.len(), 1);
+    let jobs = jobs(&app).await;
+    assert_eq!(jobs.len(), 1);
+    assert_eq!(recorded[0].job_id, Some(jobs[0].id));
+    assert_eq!(jobs[0].payload, json!({ "event_id": recorded[0].id.to_string() }));
+
+    // A change that rolls back leaves neither its event nor its job.
+    let txn = rustcms::db::begin_write(db).await.unwrap();
+    content_sync::record_event(&txn, "settings.updated", "settings", None, payload).await.unwrap();
+    txn.rollback().await.unwrap();
+    assert_eq!(content_event::Entity::find().count(db).await.unwrap(), 1);
+    assert_eq!(job::Entity::find().count(db).await.unwrap(), 1);
 });
 
 db_test!(a_503_is_recorded_and_retried, migrate = Migrator, |db: TestDb| async move {
