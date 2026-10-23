@@ -1,6 +1,6 @@
 //! The content outbox: every change the public site must learn about writes a `content_events`
-//! row in the change's own transaction. Delivery (webhooks, phase P3) reads the undelivered rows
-//! later; nothing is dispatched here.
+//! row in the change's own transaction, with its webhook delivery job
+//! (`crate::services::events::enqueue`): both commit or roll back with the change.
 //!
 //! The payload is what the frontend needs to revalidate:
 //!
@@ -40,8 +40,9 @@ impl Change {
     }
 }
 
-/// Writes one undelivered event (UUID v7 id, so ids sort by creation). Call it with the
-/// transaction of the change it reports: the event commits or rolls back with it.
+/// Writes one undelivered event (UUID v7 id, so ids sort by creation) and dispatches its delivery
+/// job. Call it with the transaction of the change it reports: the event and its job commit or
+/// roll back with it.
 pub async fn record_event(
     txn: &DatabaseTransaction,
     kind: &str,
@@ -49,8 +50,9 @@ pub async fn record_event(
     subject_id: Option<i64>,
     payload: Value,
 ) -> AppResult<()> {
+    let id = Uuid::now_v7();
     content_event::ActiveModel {
-        id: Set(Uuid::now_v7()),
+        id: Set(id),
         kind: Set(kind.to_owned()),
         subject_type: Set(subject_type.to_owned()),
         subject_id: Set(subject_id),
@@ -59,9 +61,12 @@ pub async fn record_event(
         delivered_at: Set(None),
         attempts: Set(0),
         last_error: Set(None),
+        job_id: Set(None),
+        gave_up_at: Set(None),
     }
     .insert(txn)
     .await?;
+    crate::services::events::enqueue(txn, id).await?;
     Ok(())
 }
 

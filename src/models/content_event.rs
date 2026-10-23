@@ -19,8 +19,15 @@ pub struct Model {
     pub created_at: DateTimeUtc,
     /// `None` while the event waits for delivery.
     pub delivered_at: Option<DateTimeUtc>,
+    /// Delivery attempts made (POSTs tried) across every job of the event, at most 8 in a series.
+    /// An operator retry of a job that gave up starts a new series at 0.
     pub attempts: i32,
+    /// Why the last attempt failed (redacted, at most 500 characters); `None` after a success.
     pub last_error: Option<String>,
+    /// The delivery job last dispatched for it (`crate::services::events::enqueue`).
+    pub job_id: Option<Uuid>,
+    /// When delivery stopped without success (a permanent refusal, or the last retry).
+    pub gave_up_at: Option<DateTimeUtc>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

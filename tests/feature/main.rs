@@ -11,4 +11,5 @@ mod menus;
 mod settings;
 mod taxonomy;
 mod webhook;
+mod webhook_job;
 // rustcms:tests

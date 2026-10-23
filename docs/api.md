@@ -72,10 +72,41 @@ Settings → Integrations, **at least once** (retried with backoff):
   - in Rust, `rblog::services::webhook::verify(secret, timestamp, event_id, body, signature)`
     is the reference check;
 - the body lists the **cache tags** to revalidate (`post:{id}`, `posts`, `category:{slug}`,
-  `tag:{slug}`, `menu:{key}`, `settings`, `sitemap`) and the old and new paths;
+  `tag:{slug}`, `menu:{key}`, `settings`, `sitemap`) and the old and new paths:
+
+  ```json
+  {
+    "id": "0192b0a4-7c1e-7000-8000-000000000001",
+    "kind": "category.updated",
+    "subject": { "type": "category", "id": "12" },
+    "tags": ["category:du-lich", "category:du-lich-cu", "posts", "sitemap"],
+    "paths": { "old": ["/categories/du-lich-cu"], "new": ["/categories/du-lich"] },
+    "created_at": "2026-10-24T08:15:30.123456Z"
+  }
+  ```
+
+  - `id` is the event id, the same as `X-RBlog-Event-Id`; deduplicate on it.
+  - `kind` is `{subject}.{change}` (`post.published`, `category.updated`, …). Handle unknown
+    kinds by revalidating `tags` and `paths` anyway.
+  - `subject.id` is a string (64-bit ids travel as strings), or `null` for a subject without
+    an id (`settings`).
+  - `paths.old` are public paths that no longer show this content (an old slug, a deleted
+    record): purge or redirect them. `paths.new` are the paths that show it now. Both are
+    always arrays, possibly empty.
+  - `created_at` is when the change was recorded (UTC, RFC 3339, microseconds). Deliveries can
+    arrive out of order and more than once: revalidating is the safe answer to any of them.
+  - New fields may be added; existing ones keep their name and meaning.
+- an event is retried for about an hour (8 attempts, 30 s apart at first, doubling). One the
+  receiver refuses for good (3xx, other 4xx), or that still fails after the last attempt, is not
+  sent again unless an operator retries its job on the panel's Queue page;
+- while no webhook URL is set, events are marked handled without being sent: setting a URL
+  later does not replay the backlog;
 - the URL must be `https://` (no user name or password in it) and resolve only to public
   addresses: RBlog resolves it at every delivery and refuses loopback, private, link-local and
-  other special ranges, IPv4 and IPv6;
+  other special ranges, IPv4 and IPv6. For a receiver on the developer's machine,
+  `allow_insecure_local = true` in `config/webhook.toml` also allows `http://` and loopback
+  addresses (never private ranges); RBlog refuses to start with it when `APP_ENV=production`.
+  Settings → Integrations still asks for an `https://` URL;
 - answer **2xx** within 10 seconds (5 to connect). Redirects are not followed and count as a
   failure. RBlog retries timeouts, connection errors, 408, 425, 429 and 5xx; any other answer
   (3xx, other 4xx) fails the delivery without retrying.
