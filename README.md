@@ -19,7 +19,7 @@ Linux binaries (x86_64, arm64) and the image `ghcr.io/irisvn/rblog` (`docker/Doc
 | | Before | After |
 |---|---|---|
 | Local tests (warm build) | 3.1 s (`cargo test`, 2.3 s of tests) | 2.9 s for the whole gate (fmt, clippy, tests); tests 0.4 s |
-| CI (first run, cold cache) | 173 s in one job (clippy 57 s, MySQL 20 s, tests 73 s) | see below |
+| CI (one push) | 173 s in one job (clippy 57 s, MySQL 20 s, tests 73 s; 9 tests) | about 65 s: lint 31 s and test 65 s in parallel (201 tests); admin bundle 11 s, only when `resources/admin` changes |
 
 ## Where things live
 
