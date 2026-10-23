@@ -30,6 +30,10 @@ pub fn provider() -> AdminProvider {
         .settings::<ReadingSettings>()
         .settings::<SeoSettings>()
         .settings::<IntegrationSettings>()
+        .resource::<crate::admin::resources::category_resource::CategoryResource>()
+        .resource::<crate::admin::resources::tag_resource::TagResource>()
+        .resource::<crate::admin::resources::menu_resource::MenuResource>()
+        .resource::<crate::admin::resources::menu_item_resource::MenuItemResource>()
     // rustcms:resources
     // rustcms:pages
     // rustcms:extensions
