@@ -39,4 +39,4 @@ Linux binaries (x86_64, arm64) and the image `ghcr.io/irisvn/rblog` (`docker/Doc
 | `src/database/` | `migrations/`, `seeders/`, `factories/` | `make:migration`, `make:seeder`, `make:factory` |
 | `tests/feature/` | tests through HTTP, on MySQL 8.4 only | `make:test` |
 | `config/`, `lang/`, `storage/` | configuration, translations, uploaded files | |
-| `docs/` | `ui-guidelines.md`: the admin design system | |
+| `docs/` | `ui-guidelines.md` (the admin design system), `media.md` (disks, moving files), `api.md` (Content API) | |

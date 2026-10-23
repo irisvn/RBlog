@@ -38,14 +38,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      # Started first: it gets ready while Rust builds. Services cannot take server flags.
-      # In memory and never fsynced, like docker-compose.yml's mysql-test.
+      # Started first and in the background (pull included): it gets ready while Rust builds.
+      # Services cannot take server flags. In memory and never fsynced, like mysql-test.
       - name: Start MySQL 8.4
         run: |
-          docker run -d --name mysql -p 3307:3306 -e MYSQL_ROOT_PASSWORD=root --tmpfs /var/lib/mysql mysql:8.4 \
+          nohup docker run -d --name mysql -p 3307:3306 -e MYSQL_ROOT_PASSWORD=root --tmpfs /var/lib/mysql mysql:8.4 \
             --character-set-server=utf8mb4 --collation-server=utf8mb4_0900_bin \
             --innodb-flush-log-at-trx-commit=0 --innodb-doublewrite=OFF --innodb-flush-method=nosync \
-            --sync-binlog=0 --skip-log-bin
+            --sync-binlog=0 --skip-log-bin >/tmp/mysql-start.log 2>&1 &
       - uses: dtolnay/rust-toolchain@stable
       - uses: taiki-e/install-action@v2
         with: { tool: cargo-nextest }
@@ -53,6 +53,8 @@ jobs:
         with: { shared-key: test }
       - run: cargo nextest run --locked --no-run
       - name: Wait for MySQL
-        run: for i in $(seq 1 120); do docker exec mysql mysqladmin ping -h 127.0.0.1 -uroot -proot --silent && exit 0; sleep 1; done; exit 1
+        run: |
+          for i in $(seq 1 120); do docker exec mysql mysqladmin ping -h 127.0.0.1 -uroot -proot --silent 2>/dev/null && exit 0; sleep 1; done
+          cat /tmp/mysql-start.log; exit 1
       # .cargo/config.toml selects MySQL on port 3307 and fails (never skips) without it.
       - run: cargo nextest run --locked

@@ -1,0 +1,15 @@
+# Where uploaded media are kept (RustCMS `[storage]`, guide: digging-deeper/storage.md).
+# Chosen when deploying: `local` (this machine's disk) or `s3` (AWS S3, Cloudflare R2, MinIO, …).
+# Every key can be set from the environment: RUSTCMS_STORAGE__DISK=s3, RUSTCMS_STORAGE__S3__BUCKET=…
+# S3 credentials come from AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY.
+# Switching an existing site moves its files first: `rblog media:move-disk --to s3` (docs/media.md).
+disk = "local"
+# The local disk, and the staging directory of S3 uploads. Keep it out of any web root.
+root = "storage/app"
+max_upload_bytes = 10485760
+allowed_types = ["image/png", "image/jpeg", "image/gif", "image/webp", "application/pdf"]
+
+[s3]
+# A private bucket. Local S3Mock (docker compose --profile s3 up -d):
+#   bucket = "rblog", region = "us-east-1", endpoint = "http://localhost:9090", allow_http = true
+bucket = ""

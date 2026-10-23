@@ -221,7 +221,7 @@ with `sm` buttons. Its `aria-label` names the target ("Delete image cover.jpg").
 
 | Kind | ok | busy | bad | off |
 |---|---|---|---|---|
-| Post | Published | Scheduled | — | Draft, Archived |
+| Post, Page | Published | Pending review, Scheduled | — | Draft |
 | Comment (if built) | Approved | Pending | Spam | Hidden |
 | Background job (import, export, mail) | Done | Queued, Running | Failed | — |
 | Media upload | Uploaded | Uploading, Processing | Failed | — |

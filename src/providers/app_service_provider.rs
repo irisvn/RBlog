@@ -13,6 +13,7 @@ impl ServiceProvider for AppServiceProvider {
         app.seeder(crate::database::seeders::DatabaseSeeder);
         // rustcms:seeders
         // rustcms:jobs
+        app.command(crate::console::media_move_disk::MediaMoveDisk);
         // rustcms:commands
     }
 }

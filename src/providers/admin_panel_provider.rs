@@ -15,6 +15,8 @@ pub fn provider() -> AdminProvider {
                 .color("warning", "#b45309")
                 .dark(|dark| dark.color("success", "#4ade80").color("warning", "#fbbf24")),
         )
+        // The media library (`[storage]`): uploads from forms and the editor.
+        .media()
         // Labels in Vietnamese (`rustcms lang:missing vi` lists what is missing).
         .translations("vi", include_str!("../../lang/vi.toml"))
     // rustcms:resources

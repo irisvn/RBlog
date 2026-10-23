@@ -47,5 +47,15 @@ services:
       timeout: 3s
       retries: 60
 
+  # A local S3-compatible bucket `rblog`, to try `disk = "s3"` and `media:move-disk`:
+  # `docker compose --profile s3 up -d`.
+  s3:
+    image: adobe/s3mock:5.2.3
+    profiles: ["s3"]
+    environment:
+      COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS: rblog
+    ports:
+      - "${RBLOG_S3_PORT:-9090}:9090"
+
 volumes:
   mysql-data:
