@@ -1,8 +1,7 @@
 # Content API
 
 > **Status: implemented (phase P3), read side.** This page is the contract the Nuxt/Next frontend
-> is built against. Until the admin's Integrations page exists, keys come from
-> `rblog::services::content_api::issue_content_key`.
+> is built against.
 
 RBlog is the admin and the content source; the public site is a separate Nuxt or Next app that
 reads RBlog's **read-only Content API** from its server side (SSR, ISR) and is told about
@@ -11,8 +10,13 @@ changes by a **webhook**.
 - Base path: `/api/v1/content`. JSON, RustCMS wire format: ids and 64-bit numbers as strings,
   instants in RFC 3339 UTC to the second (`2026-10-24T08:00:00Z`).
 - Authentication: a Content API key (`Authorization: Bearer rcms_…`), created on the admin's
-  Integrations page. It only reads published content. Keep it on the server: never ship it to
-  browsers (there is no CORS on purpose).
+  Integrations → Content API page (`/admin/p/content-api`). It only reads published content. Keep
+  it on the server: never ship it to browsers (there is no CORS on purpose).
+  - On that page, `integrations.view` lists the keys (never their secret) and
+    `integrations.manage` creates them (a name of at most 80 characters, no expiry or 30, 90 or 365
+    days; the secret is shown once) and revokes them at once. Both are audited (`token.created`,
+    `token.revoked`). The page calls `{admin}/api/x/integrations/content-keys` (`GET`, `POST`,
+    `DELETE /{id}`, `src/routes/admin.rs`).
   - A key is an API token of the system user `frontend@rblog.local` (API-guard role
     `content-reader`, made by `rblog db:seed`), limited to the one permission `content.read`.
   - No key, or an invalid, expired or revoked one: **401**. A token without `content.read`

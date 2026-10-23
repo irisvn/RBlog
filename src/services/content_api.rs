@@ -4,14 +4,14 @@
 
 use rustcms::AppState;
 use rustcms::audit::{AuditContext, AuditEntry};
-use rustcms::auth::entities::role;
+use rustcms::auth::entities::{personal_access_token as token, role};
 use rustcms::auth::secret::random_string;
 use rustcms::auth::tokens::{self, IssuedToken};
 use rustcms::auth::{API_GUARD, Actor, AuthState, NewUser, RbacService};
 use rustcms::models::user;
 use rustcms::{AppError, AppResult};
 use sea_orm::prelude::DateTimeUtc;
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
+use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Select};
 
 /// What a Content API key may do (every `/api/v1/content` route requires it).
 pub const PERMISSION: &str = "content.read";
@@ -34,16 +34,37 @@ pub async fn ensure_frontend_user(state: &AppState) -> anyhow::Result<user::Mode
         Some(found) => found.id,
         None => rbac.create_role(Actor::System, API_GUARD, ROLE, &[PERMISSION.to_owned()]).await?.id,
     };
-    let frontend = match frontend_user(db).await? {
-        Some(found) => found,
+    match frontend_user(db).await? {
+        // Made before with its role; assigning it again repairs a user that lost it.
+        Some(found) => {
+            rbac.assign_role(Actor::System, found.id, role_id).await?;
+            Ok(found)
+        }
+        // The user and its role in one transaction: never a frontend user without the role, whose
+        // keys would all be refused.
         None => {
             let password_hash = auth.passwords.hash(random_string(48)).await?;
             let new = NewUser { name: FRONTEND_NAME, email: FRONTEND_EMAIL, password_hash, super_admin_guard: None };
-            rbac.create_user(Actor::System, new).await?
+            Ok(rbac.create_user_with_roles(Actor::System, new, API_GUARD, &[role_id]).await?)
         }
-    };
-    rbac.assign_role(Actor::System, frontend.id, role_id).await?;
-    Ok(frontend)
+    }
+}
+
+/// The [`FRONTEND_EMAIL`] user, made by [`ensure_frontend_user`] when it is missing (the first key
+/// made on a database that was not seeded). Two first keys made at once both try to make it: the
+/// one whose role or user clashes with the other's runs it again, which then finds them.
+pub async fn frontend_user_or_create(state: &AppState) -> AppResult<user::Model> {
+    if let Some(found) = frontend_user(state.db()).await? {
+        return Ok(found);
+    }
+    let mut failure = None;
+    for _ in 0..3 {
+        match ensure_frontend_user(state).await {
+            Ok(made) => return Ok(made),
+            Err(error) => failure = Some(error),
+        }
+    }
+    Err(AppError::internal(failure.map_or_else(|| "the frontend user could not be made".into(), |e| e.to_string())))
 }
 
 /// The API-guard role [`ROLE`].
@@ -83,4 +104,37 @@ pub async fn issue_content_key(
     rustcms::audit::record(&txn, audit, entry).await?;
     txn.commit().await?;
     Ok(issued)
+}
+
+/// Live (not revoked) Content API keys, newest first: what the Integrations page lists. Expired
+/// keys stay listed until revoked. Never the secret: only its hash is stored.
+pub fn content_keys(frontend_id: i64) -> Select<token::Entity> {
+    token::Entity::find()
+        .filter(token::Column::UserId.eq(frontend_id))
+        .filter(token::Column::RevokedAt.is_null())
+        .order_by_desc(token::Column::CreatedAt)
+        .order_by_desc(token::Column::Id)
+}
+
+/// Revokes the Content API key `token_id`, recorded in the audit log as `token.revoked` in the
+/// same transaction. A key that is not a live key of the frontend user (another user's token,
+/// one already revoked, or none) is [`AppError::NotFound`].
+pub async fn revoke_content_key(db: &DatabaseConnection, token_id: i64, audit: &AuditContext) -> AppResult<()> {
+    let frontend = frontend_user(db).await?.ok_or(AppError::NotFound)?;
+    let txn = rustcms::db::begin_write(db).await?;
+    let key = token::Entity::find_by_id(token_id)
+        .filter(token::Column::UserId.eq(frontend.id))
+        .filter(token::Column::RevokedAt.is_null())
+        .lock_exclusive()
+        .one(&txn)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    tokens::revoke(&txn, key.id).await?;
+    let entry = AuditEntry::new("token.revoked", "user").key(frontend.id).meta(serde_json::json!({
+        "name": key.name,
+        "token_id": key.id.to_string(),
+    }));
+    rustcms::audit::record(&txn, audit, entry).await?;
+    txn.commit().await?;
+    Ok(())
 }

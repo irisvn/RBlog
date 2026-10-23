@@ -195,7 +195,9 @@ with `sm` buttons. Its `aria-label` names the target ("Delete image cover.jpg").
   - Long values (slugs, URLs, file names) are truncated with an ellipsis and a tooltip that shows
     the whole value. Copyable values get a copy icon button.
   - On a narrow screen the table scrolls sideways inside its card. Columns hide only by a class
-    the table chooses (`hide-sm`), never by position.
+    the table chooses, never by position: `rblog-hide-md` when the table's card is narrower than
+    640px (a tablet beside the sidebar), `rblog-hide-sm` on a phone (640px wide or less). The row
+    actions column always stays, and a hidden value that matters (an expiry) stays in a tooltip.
 - **Pagination**:
   - 25 rows a page, in a stable order: newest first, unless the column says otherwise.
   - A footer `1–25 of 132` with Previous and Next.
@@ -225,6 +227,7 @@ with `sm` buttons. Its `aria-label` names the target ("Delete image cover.jpg").
 | Comment (if built) | Approved | Pending | Spam | Hidden |
 | Background job (import, export, mail) | Done | Queued, Running | Failed | — |
 | Media upload | Uploaded | Uploading, Processing | Failed | — |
+| API key (Content API) | Active | — | — | Expired |
 
 Raw values (enum names, error codes) stay available in a tooltip or a detail view, never as the
 badge. The mapping from server states to words lives in one place, `lib/status.ts`.

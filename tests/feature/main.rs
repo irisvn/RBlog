@@ -8,6 +8,7 @@ mod content_api;
 mod content_media;
 mod content_schema;
 mod health;
+mod integrations;
 mod media_disk;
 mod menus;
 mod settings;
