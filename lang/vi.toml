@@ -107,3 +107,11 @@
 "Content" = "Nội dung"
 "Read published content" = "Đọc nội dung đã đăng"
 "Content API keys of the public site: published posts, pages, menus and settings" = "Khoá Content API của trang công khai: bài viết, trang, menu và cài đặt đã đăng"
+
+# The Content API page (admin/pages/content_api_page.rs) and its permissions
+# (`integrations.*`, providers/auth_service_provider.rs).
+"Content API" = "Content API"
+"View Content API keys" = "Xem khoá Content API"
+"See the Content API keys of the public site, never their secret" = "Xem các khoá Content API của trang công khai, không bao giờ thấy secret"
+"Manage Content API keys" = "Quản lý khoá Content API"
+"Create and revoke the keys the public site reads published content with" = "Tạo và thu hồi các khoá mà trang công khai dùng để đọc nội dung đã đăng"

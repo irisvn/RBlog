@@ -1,0 +1,10 @@
+/* The Content API page (content-api.tsx); shared pieces are in lib/ui.css. */
+
+/* The new key, shown once: selectable, wrapped anywhere so it never widens the dialog. */
+.content-api-secret {
+  margin: 0; padding: 0.75rem; overflow-wrap: anywhere; user-select: all;
+  border: 1px solid var(--border); border-radius: calc(var(--radius) - 2px); background: var(--muted);
+}
+
+/* The kit's CodeBlock scrolls sideways under its copy button on a phone: wrap the example instead. */
+.content-api-example pre { white-space: pre-wrap; overflow-wrap: anywhere; }
