@@ -16,6 +16,16 @@ Limits: `max_upload_bytes` (10 MiB), `allowed_types` (PNG, JPEG, GIF, WebP, PDF;
 accepted). Readers never fetch from the bucket directly: public images are served by RBlog's
 Content API (docs/api.md), which checks that they belong to published content.
 
+That check reads the `public_media` table: which published post or page uses which media (a
+post's rows include its author's avatar). Every write that changes what a post or page shows,
+whether it is published, or an author's avatar, recomputes the rows
+(`services::public_media::sync`). To rebuild the whole table (before opening the Content API, or
+if it ever drifted):
+
+```sh
+rblog content:sync-public-media
+```
+
 ## Trying S3 locally
 
 ```sh

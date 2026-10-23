@@ -9,3 +9,5 @@ use rustcms_testing::{TestApp, TestDb};
 pub async fn app(db: TestDb) -> TestApp {
     TestApp::new(bootstrap::build, db).await
 }
+
+pub mod content;

@@ -4,6 +4,8 @@
 #[path = "../support/mod.rs"]
 mod support;
 
+mod content_api;
+mod content_media;
 mod content_schema;
 mod health;
 mod media_disk;

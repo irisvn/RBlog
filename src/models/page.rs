@@ -1,6 +1,7 @@
 //! `pages`: standalone content (About, Contact, …): posts without category, tags or `featured`.
 //! Same workflow (`post::PostStatus`) and soft delete as posts.
 
+use sea_orm::Condition;
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
@@ -47,9 +48,24 @@ impl Related<super::page_revision::Entity> for Entity {
 
 impl ActiveModelBehavior for ActiveModel {}
 
+/// Pages the public site shows at `now`: published, due (`published_at <= now`) and not trashed.
+pub fn public_at(now: DateTimeUtc) -> Condition {
+    Condition::all()
+        .add(Column::Status.eq(super::post::PostStatus::Published.as_str()))
+        .add(Column::PublishedAt.lte(now))
+        .add(Column::DeletedAt.is_null())
+}
+
 impl Model {
     /// The page's status (`None` for a value no code writes).
     pub fn status(&self) -> Option<super::post::PostStatus> {
         super::post::PostStatus::parse(&self.status)
+    }
+
+    /// Whether the public site shows it at `now` (see [`public_at`]).
+    pub fn is_public_at(&self, now: DateTimeUtc) -> bool {
+        self.status == super::post::PostStatus::Published.as_str()
+            && self.deleted_at.is_none()
+            && self.published_at.is_some_and(|at| at <= now)
     }
 }
