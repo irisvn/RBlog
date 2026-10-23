@@ -1,0 +1,35 @@
+# Checks every push and pull request: formatting, lints, and the tests on MySQL 8.4 (RBlog's only database).
+# `Cargo.lock` is committed: CI builds exactly the versions you tested.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with: { components: "rustfmt, clippy" }
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+      - run: cargo fmt --check
+      - run: cargo clippy --locked --all-targets -- -D warnings
+      # Services cannot take server flags: MySQL is started here. .cargo/config.toml selects it for the tests.
+      - name: Start MySQL 8.4
+        run: |
+          docker run -d --name mysql -p 3306:3306 -e MYSQL_ROOT_PASSWORD=root --tmpfs /var/lib/mysql mysql:8.4 \
+            --character-set-server=utf8mb4 --collation-server=utf8mb4_0900_bin
+          for i in $(seq 1 120); do docker exec mysql mysqladmin ping -h 127.0.0.1 -uroot -proot --silent && exit 0; sleep 1; done; exit 1
+      - run: cargo test --locked
