@@ -5,6 +5,9 @@ use rustcms::ValidationErrors;
 use rustcms::admin::{Ctx, SettingField, SettingsMeta, SettingsPage};
 use rustcms::async_trait;
 
+use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
+
+use crate::models::page;
 use crate::settings::reading_settings::{HOMEPAGE_LATEST_POSTS, HOMEPAGE_PAGE, ReadingSettings};
 use crate::settings::rules::{checked, filled, is_slug};
 
@@ -40,9 +43,22 @@ impl SettingsPage for ReadingSettings {
             Some(slug) if !is_slug(slug) => {
                 errors.add("homepage_page_slug", ctx.t("may only contain lowercase letters, digits and hyphens"));
             }
-            // TODO(P2-merge): check that a page with this slug exists (in `ctx`'s transaction)
-            // once the `pages` table and model are merged.
-            _ => {}
+            // The page may still be a draft (it is published later), but it must exist and not be
+            // in the trash.
+            Some(slug) => {
+                let found = page::Entity::find()
+                    .filter(page::Column::Slug.eq(slug))
+                    .filter(page::Column::DeletedAt.is_null())
+                    .count(&ctx.conn())
+                    .await;
+                match found {
+                    Ok(0) => errors.add("homepage_page_slug", ctx.t("is not the slug of a page")),
+                    Ok(_) => {}
+                    // `validate` can only answer with validation errors: never save unchecked.
+                    Err(_) => errors.add_form(ctx.t("the page could not be checked, try again")),
+                }
+            }
+            None => {}
         }
         checked(errors)
     }

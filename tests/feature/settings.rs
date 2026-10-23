@@ -16,7 +16,29 @@ const SECRET: &str = "whsec-0123456789-abcdef";
 async fn admin(app: &TestApp) -> TestClient<'_> {
     let user = UserFactory::new().create(app.state().db()).await;
     app.make_super_admin(&user).await;
+    // The page the homepage examples show.
+    page(app, user.id, "gioi-thieu", false).await;
     app.acting_as(&user).await
+}
+
+/// A page `slug` by `author` (the homepage may show it), in the trash when `trashed`.
+async fn page(app: &TestApp, author: i64, slug: &str, trashed: bool) {
+    use sea_orm::{ActiveModelTrait, Set};
+    let now: sea_orm::prelude::DateTimeUtc = std::time::SystemTime::now().into();
+    rblog::models::page::ActiveModel {
+        title: Set(slug.into()),
+        slug: Set(slug.into()),
+        author_id: Set(author),
+        status: Set("draft".into()),
+        reading_minutes: Set(0),
+        created_at: Set(now),
+        updated_at: Set(now),
+        deleted_at: Set(trashed.then_some(now)),
+        ..Default::default()
+    }
+    .insert(app.state().db())
+    .await
+    .unwrap();
 }
 
 /// `PUT settings/{group}` with `data`, at the version the page is at now.
@@ -89,6 +111,8 @@ db_test!(super_admin_reads_and_updates_each_page, migrate = Migrator, |db: TestD
 db_test!(settings_refuse_invalid_values, migrate = Migrator, |db: TestDb| async move {
     let app = support::app(db).await;
     let admin = admin(&app).await;
+    let author = UserFactory::new().create(app.state().db()).await;
+    page(&app, author.id, "da-xoa", true).await;
 
     let refused = [
         ("general", json!({ "frontend_url": "http://blog.example.com" }), "frontend_url"),
@@ -107,6 +131,9 @@ db_test!(settings_refuse_invalid_values, migrate = Migrator, |db: TestDb| async 
         ("reading", json!({ "homepage_shows": "page" }), "homepage_page_slug"),
         ("reading", json!({ "homepage_shows": "page", "homepage_page_slug": "  " }), "homepage_page_slug"),
         ("reading", json!({ "homepage_shows": "page", "homepage_page_slug": "Giới thiệu" }), "homepage_page_slug"),
+        // No such page, and a page in the trash.
+        ("reading", json!({ "homepage_shows": "page", "homepage_page_slug": "khong-co" }), "homepage_page_slug"),
+        ("reading", json!({ "homepage_shows": "page", "homepage_page_slug": "da-xoa" }), "homepage_page_slug"),
     ];
     for (group, data, field) in refused {
         save(&app, &admin, group, data).await.assert_validation_error(field);

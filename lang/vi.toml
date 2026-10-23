@@ -53,4 +53,6 @@
 "is required when a webhook URL is set" = "không được để trống khi đã đặt URL webhook"
 "must be a path starting with /" = "phải là đường dẫn bắt đầu bằng /"
 "is required when the homepage shows a page" = "không được để trống khi trang chủ hiển thị một trang"
+"is not the slug of a page" = "không phải slug của một trang"
+"the page could not be checked, try again" = "chưa kiểm tra được trang, hãy thử lại"
 "may only contain lowercase letters, digits and hyphens" = "chỉ được chứa chữ thường không dấu, chữ số và dấu gạch ngang"
