@@ -52,7 +52,7 @@ async fn app(db: TestDb) -> TestApp {
     TestApp::with_config(bootstrap::build, config, db).await
 }
 
-/// Saves Settings → Integrations directly (the panel refuses `http://`).
+/// Saves Settings → Integrations directly (quicker than through the panel).
 async fn configure(app: &TestApp, url: &str) {
     let state = app.state();
     let txn = rustcms::db::begin_write(state.db()).await.unwrap();

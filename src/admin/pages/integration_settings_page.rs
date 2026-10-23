@@ -3,8 +3,9 @@
 
 use rustcms::ValidationErrors;
 use rustcms::admin::{Ctx, SettingField, SettingsMeta, SettingsPage};
-use rustcms::async_trait;
+use rustcms::{AppState, async_trait};
 
+use crate::services::events::WebhookConfig;
 use crate::settings::integration_settings::IntegrationSettings;
 use crate::settings::rules::{checked, is_site_path, is_web_url};
 
@@ -37,18 +38,29 @@ impl SettingsPage for IntegrationSettings {
     }
 
     async fn validate(ctx: &Ctx, settings: &Self) -> Result<(), ValidationErrors> {
-        let mut errors = ValidationErrors::new();
-        if let Some(url) = settings.webhook_url() {
-            if !is_web_url(url, false) {
-                errors.add("webhook_url", ctx.t("must be an https address"));
-            }
-            if !settings.webhook_secret.is_set() {
-                errors.add("webhook_secret", ctx.t("is required when a webhook URL is set"));
-            }
-        }
-        if !is_site_path(&settings.preview_path) {
-            errors.add("preview_path", ctx.t("must be a path starting with /"));
-        }
-        checked(errors)
+        check(ctx, settings, false)
     }
+
+    /// With `[webhook] allow_insecure_local` (development only; refused in production at boot),
+    /// an `http://localhost` receiver is accepted too, as the delivery job accepts it.
+    async fn validate_in(state: &AppState, ctx: &Ctx, settings: &Self) -> Result<(), ValidationErrors> {
+        let local = WebhookConfig::of(state.config()).is_ok_and(|c| c.allow_insecure_local);
+        check(ctx, settings, local)
+    }
+}
+
+fn check(ctx: &Ctx, settings: &IntegrationSettings, local_http: bool) -> Result<(), ValidationErrors> {
+    let mut errors = ValidationErrors::new();
+    if let Some(url) = settings.webhook_url() {
+        if !is_web_url(url, local_http) {
+            errors.add("webhook_url", ctx.t("must be an https address"));
+        }
+        if !settings.webhook_secret.is_set() {
+            errors.add("webhook_secret", ctx.t("is required when a webhook URL is set"));
+        }
+    }
+    if !is_site_path(&settings.preview_path) {
+        errors.add("preview_path", ctx.t("must be a path starting with /"));
+    }
+    checked(errors)
 }

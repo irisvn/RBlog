@@ -237,3 +237,18 @@ db_test!(public_settings_leave_out_integrations, migrate = Migrator, |db: TestDb
         assert!(!wire.contains(hidden), "`{hidden}` in {wire}");
     }
 });
+
+db_test!(a_local_webhook_needs_the_development_flag, migrate = Migrator, |db: TestDb| async move {
+    let local = json!({ "webhook_url": "http://localhost:3000/api/revalidate", "webhook_secret": SECRET });
+    let config = rustcms_testing::test_config(db.url()).with("webhook.allow_insecure_local", true).unwrap();
+    let app = TestApp::with_config(rblog::bootstrap::build, config, db).await;
+    let admin = admin(&app).await;
+    save(&app, &admin, "integrations", local).await.assert_status(StatusCode::OK);
+});
+
+db_test!(a_local_webhook_is_refused_without_the_flag, migrate = Migrator, |db: TestDb| async move {
+    let app = support::app(db).await;
+    let admin = admin(&app).await;
+    let local = json!({ "webhook_url": "http://localhost:3000/api/revalidate", "webhook_secret": SECRET });
+    save(&app, &admin, "integrations", local).await.assert_status(StatusCode::UNPROCESSABLE_ENTITY);
+});
