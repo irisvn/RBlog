@@ -323,7 +323,7 @@ async fn without_the_flag_localhost_is_refused_before_any_connection() {
 }
 
 /// A 400 whose body never finishes stays Permanent: the status decides, and reading the body
-/// for the message stops at the 10 s deadline.
+/// for the message stops at the deadline (shortened to 1 s here; 10 s in production).
 #[tokio::test]
 async fn a_stalled_error_body_keeps_the_status_classification() {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -346,10 +346,10 @@ async fn a_stalled_error_body_keeps_the_status_classification() {
     });
 
     let started = std::time::Instant::now();
-    let target = local(addr, "127.0.0.1", "/hook?token=url-token-1234");
+    let target = local(addr, "127.0.0.1", "/hook?token=url-token-1234").with_timeout(Duration::from_secs(1));
     let error = webhook::deliver(&target, SECRET, EVENT, BODY).await.unwrap_err();
     assert!(matches!(error, DeliveryError::Permanent(_)), "{error}");
     assert!(error.message().contains("400") && error.message().contains("still sending for [redacted]"), "{error}");
     assert!(!error.message().contains("url-token"), "a cut token is redacted too: {error}");
-    assert!(started.elapsed() < Duration::from_secs(12), "bounded by the deadline");
+    assert!(started.elapsed() < Duration::from_secs(3), "bounded by the deadline");
 }

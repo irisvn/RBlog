@@ -75,6 +75,8 @@ pub struct WebhookTarget {
     host: Host,
     port: u16,
     allow_insecure_local: bool,
+    /// The whole delivery's deadline (DNS, connect, request, response): `TOTAL_TIMEOUT`.
+    timeout: Duration,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -127,7 +129,13 @@ impl WebhookTarget {
             },
         };
         let port = url.port_or_known_default().ok_or(InvalidTarget("the webhook URL has no port"))?;
-        Ok(Self { url, host, port, allow_insecure_local })
+        Ok(Self { url, host, port, allow_insecure_local, timeout: TOTAL_TIMEOUT })
+    }
+
+    /// A shorter (or longer) deadline than the 10 s default: tests that wait for it.
+    pub fn with_timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = timeout;
+        self
     }
 
     /// The URL, which may hold a token in its path or query: never log it.
@@ -314,7 +322,7 @@ pub async fn deliver(
     event_id: &str,
     body: &[u8],
 ) -> Result<Delivered, DeliveryError> {
-    let deadline = Instant::now() + TOTAL_TIMEOUT;
+    let deadline = Instant::now() + target.timeout;
     let host = target.host();
     // Header values must be visible ASCII; event ids are UUIDs.
     if event_id.is_empty() || !event_id.bytes().all(|b| b.is_ascii_graphic()) {
@@ -329,8 +337,8 @@ pub async fn deliver(
             .redirect(redirect::Policy::none())
             .no_proxy()
             .https_only(!target.allow_insecure_local)
-            .connect_timeout(CONNECT_TIMEOUT)
-            .timeout(TOTAL_TIMEOUT)
+            .connect_timeout(CONNECT_TIMEOUT.min(target.timeout))
+            .timeout(target.timeout)
             .dns_resolver(Arc::new(NoResolver));
         if let Host::Domain(domain) = &target.host {
             builder = builder.resolve_to_addrs(domain, &addrs);
