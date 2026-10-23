@@ -1,0 +1,36 @@
+# The admin panel's React pages (resources/admin): only when they change. The built bundle is
+# committed (the Rust build embeds it), so CI rebuilds it and fails if the commit differs.
+name: admin
+
+on:
+  push:
+    branches: [main]
+    paths: ["resources/admin/**", ".github/workflows/admin.yml"]
+  pull_request:
+    paths: ["resources/admin/**", ".github/workflows/admin.yml"]
+
+concurrency:
+  group: admin-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: resources/admin
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: resources/admin/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - name: The committed bundle is the built one
+        run: git diff --exit-code -- js css .rustcms-build.json
+      # docs/ui-guidelines.md §6: never the browser's own dialogs.
+      - name: No window.confirm/alert/prompt
+        run: "! grep -rnE '\\b(window\\.)?(confirm|alert|prompt)\\(' src --include='*.ts' --include='*.tsx'"
