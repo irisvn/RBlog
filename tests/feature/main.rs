@@ -8,4 +8,5 @@ mod content_schema;
 mod health;
 mod media_disk;
 mod settings;
+mod webhook;
 // rustcms:tests
