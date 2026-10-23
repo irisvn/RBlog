@@ -1,5 +1,8 @@
 # Local MySQL 8.4 for rblog: `docker compose up -d --wait` starts both servers.
 # rustcms requires utf8mb4 / utf8mb4_0900_bin, InnoDB and a strict sql_mode (MySQL 8.4's default).
+# One project name wherever it runs from (git worktrees included): one set of containers.
+name: rblog
+
 services:
   # Development data, kept in a volume.
   mysql:
