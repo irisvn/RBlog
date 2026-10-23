@@ -1,6 +1,8 @@
 # RBlog runs on MySQL 8.4 only: `db_test!` runs on MySQL and fails (never skips) without it.
-# Start it with `docker compose up -d --wait`. Variables set in the shell take precedence.
+# Tests use the in-memory `mysql-test` server of docker-compose.yml (port 3307), never the
+# development data on 3306. Start both with `docker compose up -d --wait`.
+# Variables set in the shell take precedence.
 [env]
 RUSTCMS_TEST_BACKENDS = "mysql"
 RUSTCMS_TEST_REQUIRE = "mysql"
-RUSTCMS_TEST_MYSQL = "mysql://root:root@localhost:3306/mysql"
+RUSTCMS_TEST_MYSQL = "mysql://root:root@localhost:3307/mysql"

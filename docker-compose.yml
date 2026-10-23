@@ -1,6 +1,7 @@
-# Local MySQL 8.4 for rblog: `docker compose up -d --wait`.
+# Local MySQL 8.4 for rblog: `docker compose up -d --wait` starts both servers.
 # rustcms requires utf8mb4 / utf8mb4_0900_bin, InnoDB and a strict sql_mode (MySQL 8.4's default).
 services:
+  # Development data, kept in a volume.
   mysql:
     image: mysql:8.4
     environment:
@@ -15,6 +16,31 @@ services:
       - "${RBLOG_MYSQL_PORT:-3306}:3306"
     volumes:
       - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -proot --silent"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+
+  # Tests only (.cargo/config.toml): data in memory and never fsynced, which is much
+  # faster. Every test makes its own database, so there is nothing to lose. Never
+  # use these flags for data you keep.
+  mysql-test:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+    command:
+      - "--character-set-server=utf8mb4"
+      - "--collation-server=utf8mb4_0900_bin"
+      - "--innodb-flush-log-at-trx-commit=0"
+      - "--innodb-doublewrite=OFF"
+      - "--innodb-flush-method=nosync"
+      - "--sync-binlog=0"
+      - "--skip-log-bin"
+    tmpfs:
+      - /var/lib/mysql
+    ports:
+      - "${RBLOG_MYSQL_TEST_PORT:-3307}:3306"
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -proot --silent"]
       interval: 2s

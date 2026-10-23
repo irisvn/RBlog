@@ -207,25 +207,25 @@ document.
 - Test HTTP behaviour through feature tests (`rustcms make:test`), with
   `rustcms_testing::db_test!` and helpers such as `acting_as`, `login_as`, `with_token` and
   factories.
-- Tests run on **MySQL only**: `.cargo/config.toml` sets `RUSTCMS_TEST_BACKENDS=mysql`,
-  `RUSTCMS_TEST_REQUIRE=mysql` and the local URL. Without a reachable MySQL the tests **fail**;
-  they never skip. Never override these settings to make a run pass.
+- Tests run on **MySQL only**, on the in-memory `mysql-test` server (port 3307,
+  `docker-compose.yml`), never on the development data (3306). `.cargo/config.toml` sets
+  `RUSTCMS_TEST_BACKENDS=mysql`, `RUSTCMS_TEST_REQUIRE=mysql` and the URL. Without a reachable
+  MySQL the tests **fail**; they never skip. Never override these settings to make a run pass.
+- Tests run with `cargo nextest` (parallel processes).
 - A new route needs a test that it refuses callers without the permission.
-- Before every commit, run the whole gate and keep failures visible:
-
-  ```sh
-  (
-    set -e
-    set -o pipefail
-    docker compose up -d --wait   # MySQL 8.4
-    cargo test --locked           # MySQL only, via .cargo/config.toml
-    cargo fmt --check
-    cargo clippy --locked --all-targets -- -D warnings
-  )
-  ```
-
-  For UI changes, also run `npm run typecheck && npm run build` in `resources/admin`, then the
-  checks in §2.
+- **The gate is `scripts/check.sh`.** It starts MySQL, then runs `cargo fmt --check`,
+  `cargo clippy --locked --all-targets -- -D warnings` and every test, stopping at the first
+  failure.
+  - While coding, run `scripts/check.sh fast 'test(post)'`, which runs only the matching tests.
+  - Before every commit, run the whole `scripts/check.sh`.
+  - For UI changes, also run `npm run typecheck && npm run build` in `resources/admin`, then the
+    checks in §2.
+- **CI** (`.github/workflows/ci.yml`):
+  - Two parallel jobs, `lint` and `test`.
+  - It skips documentation-only changes, and a newer push cancels the older run.
+  - Keep these properties, and keep CI's MySQL flags identical to `mysql-test`.
+- **Releases** (`.github/workflows/release.yml`) run only on a `vX.Y.Z` tag, which must match
+  `Cargo.toml`. Tag only a commit whose CI is green.
 - Never call a task done when its tests fail or were skipped. Report the real output.
 
 ## 4. Workflow

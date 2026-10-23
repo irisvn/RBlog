@@ -3,12 +3,23 @@
 A [RustCMS](https://irisvn.github.io/RustCMS/) application. Commit `Cargo.lock`: it pins the RustCMS commit and every dependency.
 
 ```sh
-docker compose up -d --wait   # MySQL 8.4 on localhost:3306 (database/user/password: rblog)
+docker compose up -d --wait   # MySQL 8.4: dev data on 3306 (database/user/password: rblog), tests on 3307 (in memory)
 rustcms migrate          # create tables (MySQL 8.4 only, DATABASE_URL in .env)
 rustcms db:seed          # run src/database/seeders (DatabaseSeeder)
 rustcms serve            # http://localhost:8000/health, the admin panel at /admin
-cargo test               # on MySQL only (.cargo/config.toml); fails if MySQL is not running
+scripts/check.sh         # the gate: fmt, clippy, every test (MySQL only, cargo-nextest)
+scripts/check.sh fast 'test(post)'   # while coding: only the matching tests
 ```
+
+Releases: push a tag `vX.Y.Z` (matching `Cargo.toml`) on a commit whose CI is green. It builds the
+Linux binaries (x86_64, arm64) and the image `ghcr.io/irisvn/rblog` (`docker/Dockerfile`).
+
+### Test and CI times
+
+| | Before | After |
+|---|---|---|
+| Local tests (warm build) | 3.1 s (`cargo test`, 2.3 s of tests) | 2.9 s for the whole gate (fmt, clippy, tests); tests 0.4 s |
+| CI (first run, cold cache) | 173 s in one job (clippy 57 s, MySQL 20 s, tests 73 s) | see below |
 
 ## Where things live
 

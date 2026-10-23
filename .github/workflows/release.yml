@@ -1,0 +1,87 @@
+# A release: push a tag `vX.Y.Z` once main's CI is green for that commit (the tests are not
+# run again here). It builds the Linux binaries natively (x86_64, arm64), attaches them to the
+# GitHub Release, and publishes the image ghcr.io/<owner>/rblog:X.Y.Z (and :latest) from them.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+# One release at a time per tag.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  binary:
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: The tag matches Cargo.toml
+        run: |
+          cargo_version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -1)
+          if [ "${GITHUB_REF_NAME#v}" != "$cargo_version" ]; then
+            echo "::error::the tag says ${GITHUB_REF_NAME#v}, Cargo.toml $cargo_version"
+            exit 1
+          fi
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with: { shared-key: "release-${{ matrix.arch }}" }
+      - run: cargo build --release --locked
+      - name: Package
+        run: |
+          mkdir -p "dist/${{ matrix.arch }}"
+          cp target/release/rblog "dist/${{ matrix.arch }}/rblog"
+          strip "dist/${{ matrix.arch }}/rblog"
+          tar -czf "rblog-${GITHUB_REF_NAME}-linux-${{ matrix.arch }}.tar.gz" -C "dist/${{ matrix.arch }}" rblog -C "$PWD" config
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rblog-${{ matrix.arch }}
+          path: |
+            dist/${{ matrix.arch }}/rblog
+            rblog-*.tar.gz
+          retention-days: 1
+
+  publish:
+    needs: binary
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: rblog-*
+          merge-multiple: true
+      - run: chmod +x dist/*/rblog
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Image (from the binaries, no build inside Docker)
+        run: |
+          image="ghcr.io/$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')/rblog"
+          docker buildx build --platform linux/amd64,linux/arm64 -f docker/Dockerfile \
+            --build-arg RBLOG_VERSION="${GITHUB_REF_NAME#v}" --build-arg RBLOG_COMMIT="$GITHUB_SHA" \
+            -t "$image:${GITHUB_REF_NAME#v}" -t "$image:latest" --push .
+      - name: GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" rblog-*.tar.gz --title "$GITHUB_REF_NAME" --generate-notes --verify-tag

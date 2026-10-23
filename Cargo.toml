@@ -19,3 +19,17 @@ serde_json = "1"
 rustcms-testing = { git = "https://github.com/irisvn/RustCMS-Core", tag = "v0.8.2" }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 [workspace]
+
+# Builds and links faster: line tables are enough for panics and backtraces in development.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.test]
+debug = 0
+
+# Password hashing is far too slow unoptimised, and every sign-in in a test hashes (as RustCMS does).
+[profile.dev.package.argon2]
+opt-level = 3
+
+[profile.dev.package.blake2]
+opt-level = 3

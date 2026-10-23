@@ -1,0 +1,6 @@
+target
+.git
+.env
+storage
+.idea
+resources/admin/node_modules
