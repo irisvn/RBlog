@@ -1,20 +1,30 @@
 # Content API
 
-> **Status: planned (phase P3).** This page is the contract the Nuxt/Next frontend is built
-> against; it is completed with the implementation, in the same change.
+> **Status: implemented (phase P3), read side.** This page is the contract the Nuxt/Next frontend
+> is built against. Until the admin's Integrations page exists, keys come from
+> `rblog::services::content_api::issue_content_key`.
 
 RBlog is the admin and the content source; the public site is a separate Nuxt or Next app that
 reads RBlog's **read-only Content API** from its server side (SSR, ISR) and is told about
 changes by a **webhook**.
 
 - Base path: `/api/v1/content`. JSON, RustCMS wire format: ids and 64-bit numbers as strings,
-  instants in RFC 3339 UTC (`2026-10-24T08:00:00Z`).
+  instants in RFC 3339 UTC to the second (`2026-10-24T08:00:00Z`).
 - Authentication: a Content API key (`Authorization: Bearer rcms_…`), created on the admin's
   Integrations page. It only reads published content. Keep it on the server: never ship it to
   browsers (there is no CORS on purpose).
+  - A key is an API token of the system user `frontend@rblog.local` (API-guard role
+    `content-reader`, made by `rblog db:seed`), limited to the one permission `content.read`.
+  - No key, or an invalid, expired or revoked one: **401**. A token without `content.read`
+    (another user's, or one issued with other abilities): **403**.
+- Published means `status = published`, `published_at` reached, not in the trash. Nothing else
+  is ever answered, not even through an old slug.
 - Lists: `?page` (from 1) and `?per_page` (default 20, at most 100), answered as
-  `{ "data": [...], "meta": { "page", "perPage", "total", "lastPage" } }`, newest first
-  (`published_at`, then `id`).
+  `{ "data": [...], "meta": { "page", "perPage", "total", "lastPage" } }`. Posts and pages come
+  newest first (`published_at`, then `id`, both descending: stable across pages); categories
+  and tags by name.
+- Query parameters a route reads may be given once (twice: 422 on that parameter); others are
+  ignored.
 - Paths: RBlog names each public page of the frontend the same way everywhere (menus, sitemap,
   webhook): `/posts/{slug}`, `/{slug}` for a page, `/categories/{slug}`, `/tags/{slug}`,
   `/authors/{slug}`. Map them to your routes if they differ.
@@ -24,17 +34,39 @@ changes by a **webhook**.
 
 | Method and path | What |
 |---|---|
-| `GET /posts` | published posts; filters `category`, `tag`, `author` (slugs), `featured`, `q` (accent-insensitive search) |
-| `GET /posts/{slug}` | one post; an old slug answers `{ "redirect": "<new slug>" }` |
-| `GET /pages`, `GET /pages/{slug}` | static pages |
-| `GET /categories`, `GET /categories/{slug}` | with their number of published posts |
-| `GET /tags`, `GET /tags/{slug}` | with their number of published posts |
-| `GET /authors/{slug}` | an author's public profile |
-| `GET /menus/{key}` | `primary`, `footer`: items with resolved links (only to published content) |
-| `GET /settings` | the public site settings (name, description, language, SEO defaults, social links) |
+| `GET /posts` | published posts; filters below |
+| `GET /posts/{slug}` | one post, with `html`; an old slug answers `{ "redirect": "<new slug>" }` |
+| `GET /pages`, `GET /pages/{slug}` | static pages: a post without `category`, `tags`, `featured`; old slugs redirect the same way |
+| `GET /categories`, `GET /categories/{slug}` | `{id, slug, name, description, meta_title, meta_description, post_count}`; old slugs redirect |
+| `GET /tags`, `GET /tags/{slug}` | `{id, slug, name, description, post_count}`; old slugs redirect |
+| `GET /authors/{slug}` | `{slug, name, bio, website, avatar}`; 404 for an author without a published post |
+| `GET /menus/{key}` | `primary`, `footer`: `{key, name, items}`, links resolved (only to published content) |
+| `GET /settings` | the public site settings (name, description, language, frontend URL, posts per page, SEO defaults, social links, homepage) |
 | `GET /sitemap?type=post&after=<cursor>` | `{type, path, lastmod}` in batches of 1000, for the frontend's sitemap |
-| `GET /api/v1/preview/{token}` | a draft, for the frontend's preview route (short-lived token, `no-store`) |
+| `GET /api/v1/preview?token=<token>` | a draft, for the frontend's preview route (short-lived token, `no-store`), no key needed |
+| `GET /api/v1/preview/media/{id}?token=<token>` | an image of that draft |
 | `GET /api/v1/media/{id}/{name}` | a public image (only images of published content), no key needed |
+
+`post_count` counts published posts only. `post_count`, `reading_minutes`, `width` and `height`
+are JSON numbers.
+
+### Filters of `GET /posts`
+
+- `category`, `tag`, `author`: slugs (an unknown slug gives an empty list). They combine.
+- `featured`: `true` or `false` (also `1`, `0`); anything else is 422.
+- `q`: accent- and case-insensitive search in the title, excerpt and body text (`viet` finds
+  "Việt"); `%` and `_` are literal. At most 100 characters (422 beyond).
+
+### Redirects
+
+A slug that is not current but that a published post (page, category, tag) had before answers
+**200** `{ "redirect": "<current slug>" }`: redirect (301) to the current path. An old slug of
+content that is not published is a plain 404.
+
+### Lists and single records
+
+List items (`GET /posts`, `GET /pages`) carry every field of a single record except `html` and
+`document`: fetch the record for its body.
 
 ## A post
 
@@ -49,6 +81,7 @@ changes by a **webhook**.
   "category": { "slug": "du-lich", "name": "Du lịch" },
   "tags": [{ "slug": "ha-noi", "name": "Hà Nội" }],
   "author": { "slug": "an", "name": "An" },
+  "featured": false,
   "published_at": "2026-10-24T08:00:00Z",
   "updated_at": "2026-10-24T09:12:00Z",
   "reading_minutes": 4,
@@ -56,8 +89,70 @@ changes by a **webhook**.
 }
 ```
 
+- `html` is the body rendered by RustCMS (every text escaped). An image that is not public
+  (see below) is left out of it, and `cover` or `seo.og_image` is then `null`.
+- Image URLs are absolute, on `APP_URL`. The last segment is the file name, cosmetic only.
+- `cover.alt` is the media's file name until media get alt texts.
+- `seo.og_image` is the URL of the OG image (a string), or `null`.
+- `author.slug` is `null` when the author has no public profile; `category` is `null` without
+  one; `tags` keep the order set in the admin.
+
 `?include=document` adds `document`, the rich-text JSON, for frontends that render it with their
-own components instead of `html`.
+own components instead of `html` (any other `include` value is 422). Its images are media ids:
+show those whose URL appears in `html` or `cover`.
+
+## Menus
+
+```json
+{ "key": "primary", "name": "Primary", "items": [
+  { "id": "1", "label": "Home", "href": "/", "new_tab": false, "children": [
+    { "id": "2", "label": "Xin chào", "href": "/posts/xin-chao-viet-nam", "new_tab": false }
+  ] },
+  { "id": "3", "label": "GitHub", "href": "https://github.com/…", "new_tab": true, "children": [] }
+] }
+```
+
+Items come in their admin order, one level deep. A link to a post, page, category or tag has its
+path (see Paths); a URL link keeps its URL. Items whose target is not published (draft,
+scheduled, trashed, deleted) are left out, with the items under them.
+
+## Sitemap
+
+`GET /sitemap?type=post|page|category|tag[&after=<cursor>]` answers
+`{ "data": [{ "type", "path", "lastmod" }], "next": "<cursor>" | null }`: at most 1000 entries,
+then `next` until the last batch. Pass `next` back as `after`; treat it as opaque. Posts and
+pages are the published ones; categories and tags those with a published post. `lastmod` is the
+record's last change.
+
+## Images
+
+`GET /api/v1/media/{id}/{name}` needs no key: it is the URL in `html` and `cover`.
+
+- It serves an image (PNG, JPEG, GIF, WebP) used by published content (cover, OG image, body,
+  or the avatar of an author with a published post), unless the image is in the trash. Anything
+  else is the same 404, whether it exists or not.
+- `Cache-Control: public, max-age=3600` (an image that stops being public stays at most an hour
+  in caches; never `immutable`), `X-Content-Type-Options: nosniff`, a sandboxing CSP.
+- Rate limited per client address (600 a minute, then 429 with `Retry-After`). Put a CDN in
+  front of it for real traffic.
+
+## Preview
+
+A preview link from the admin carries a token (43 letters and digits). Its frontend route calls
+`GET /api/v1/preview?token=<token>` from the server, without a key: the token is the access. It
+is a query parameter, not a path segment, so that it stays out of RBlog's request log (which
+records paths only).
+
+- The answer is the post or page as above, in whatever status, plus
+  `"preview": { "type": "post" | "page", "status": "draft" | "pending" | "scheduled" | "published" }`.
+  `published_at` may be `null`.
+- Its image URLs are `/api/v1/preview/media/{id}?token=<token>`: they serve only the cover, the OG
+  image and the body images of that one post or page (not trashed), while the token works.
+- A token lasts one hour and can be revoked. Expired, revoked and unknown tokens, and a trashed
+  post or page, answer 404.
+- Every answer (errors included) is `Cache-Control: private, no-store` with
+  `Referrer-Policy: no-referrer`: never cache it, never put it behind a shared cache. Rate
+  limited per client address (300 a minute for both routes together).
 
 ## Webhook
 

@@ -17,6 +17,7 @@ impl ServiceProvider for AppServiceProvider {
     fn register(&self, app: &mut AppBuilder) {
         // `rustcms db:seed` runs this one (it calls the others).
         app.seeder(crate::database::seeders::DatabaseSeeder);
+        app.seeder(crate::database::seeders::content_api_seeder::ContentApiSeeder);
         // rustcms:seeders
         app.job::<crate::jobs::deliver_content_event::DeliverContentEvent>();
         // rustcms:jobs
@@ -28,6 +29,7 @@ impl ServiceProvider for AppServiceProvider {
                 .without_overlapping(),
         );
         app.command(crate::console::media_move_disk::MediaMoveDisk);
+        app.command(crate::console::content_sync_public_media::ContentSyncPublicMedia);
         // rustcms:commands
     }
 

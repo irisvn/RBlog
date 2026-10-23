@@ -1,6 +1,7 @@
 //! `posts`: articles, with a category, tags (`post_tag`), revisions and a publishing workflow
 //! (`PostStatus`). Trashed posts keep `deleted_at` set, and their slug.
 
+use sea_orm::Condition;
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
@@ -82,6 +83,14 @@ impl Related<super::post_revision::Entity> for Entity {
 
 impl ActiveModelBehavior for ActiveModel {}
 
+/// Posts the public site shows at `now`: published, due (`published_at <= now`) and not trashed.
+pub fn public_at(now: DateTimeUtc) -> Condition {
+    Condition::all()
+        .add(Column::Status.eq(PostStatus::Published.as_str()))
+        .add(Column::PublishedAt.lte(now))
+        .add(Column::DeletedAt.is_null())
+}
+
 /// Where a post or page is in the publishing workflow (`posts.status`, `pages.status`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum PostStatus {
@@ -119,6 +128,13 @@ impl Model {
     /// The post's status (`None` for a value no code writes).
     pub fn status(&self) -> Option<PostStatus> {
         PostStatus::parse(&self.status)
+    }
+
+    /// Whether the public site shows it at `now` (see [`public_at`]).
+    pub fn is_public_at(&self, now: DateTimeUtc) -> bool {
+        self.status == PostStatus::Published.as_str()
+            && self.deleted_at.is_none()
+            && self.published_at.is_some_and(|at| at <= now)
     }
 }
 

@@ -5,6 +5,7 @@
 use rustcms::database::Seeder;
 use rustcms::{AppState, async_trait};
 
+pub mod content_api_seeder;
 // rustcms:seeder-mods
 
 pub struct DatabaseSeeder;
@@ -19,6 +20,7 @@ impl Seeder for DatabaseSeeder {
         rustcms::database::call(
             state,
             &[
+                &content_api_seeder::ContentApiSeeder,
                 // rustcms:seeder-calls
             ],
         )

@@ -102,3 +102,8 @@
 "must be an item of the same menu" = "phải là một mục của cùng menu"
 "must be a top-level item" = "phải là mục cấp đầu"
 "cannot be set on an item that has sub-items" = "không đặt được cho mục đang có mục con"
+
+# The Content API permission (`content.read`, providers/auth_service_provider.rs).
+"Content" = "Nội dung"
+"Read published content" = "Đọc nội dung đã đăng"
+"Content API keys of the public site: published posts, pages, menus and settings" = "Khoá Content API của trang công khai: bài viết, trang, menu và cài đặt đã đăng"

@@ -3,4 +3,5 @@
 //! (records as JSON). Routes are declared in `crate::routes`.
 
 pub mod controllers;
+pub mod resources;
 // rustcms:http-mods
