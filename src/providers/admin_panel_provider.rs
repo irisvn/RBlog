@@ -19,6 +19,10 @@ pub fn provider() -> AdminProvider {
         .media()
         // Labels in Vietnamese (`rustcms lang:missing vi` lists what is missing).
         .translations("vi", include_str!("../../lang/vi.toml"))
+        .resource::<crate::admin::resources::category_resource::CategoryResource>()
+        .resource::<crate::admin::resources::tag_resource::TagResource>()
+        .resource::<crate::admin::resources::menu_resource::MenuResource>()
+        .resource::<crate::admin::resources::menu_item_resource::MenuItemResource>()
     // rustcms:resources
     // rustcms:pages
     // rustcms:extensions

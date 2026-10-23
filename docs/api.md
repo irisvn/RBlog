@@ -67,5 +67,27 @@ Settings → Integrations, **at least once** (retried with backoff):
 - the body lists the **cache tags** to revalidate (`post:{id}`, `posts`, `category:{slug}`,
   `tag:{slug}`, `menu:{key}`, `settings`, `sitemap`) and the old and new paths.
 
+Each event is a row of RBlog's outbox (`content_events`), written in the same transaction as
+the change (`src/services/content_sync.rs`). Its payload:
+
+```json
+{
+  "tags": ["category:du-lich", "category:du-lich-cu", "posts", "sitemap"],
+  "paths": { "old": ["/category/du-lich-cu"], "new": ["/category/du-lich"] }
+}
+```
+
+- `tags`: what to revalidate, without duplicates. A renamed category or tag lists its new and
+  its old slug.
+- `paths.old`: paths that no longer show the content (an old slug, a deleted record);
+  `paths.new`: the paths that show it now. Categories are `/category/{slug}` and tags
+  `/tag/{slug}`; a menu has no path of its own (both lists empty).
+
+| Event kind | When | Tags |
+|---|---|---|
+| `category.created`, `category.updated`, `category.deleted` | a category is written | `category:{slug}` (and the old slug on a rename), `posts`, `sitemap` |
+| `tag.created`, `tag.updated`, `tag.deleted` | a tag is written | `tag:{slug}` (and the old slug on a rename), `posts`, `sitemap` |
+| `menu.created`, `menu.updated`, `menu.deleted` | a menu or one of its items is written (an item change is `menu.updated`) | `menu:{key}` |
+
 Keep a fallback time-based revalidation (for example 10 minutes) in case the webhook stays
 unreachable.
