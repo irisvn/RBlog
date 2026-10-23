@@ -67,7 +67,7 @@ db_test!(a_category_slug_is_made_from_its_vietnamese_name, migrate = Migrator, |
     assert_eq!(
         events[0].payload,
         json!({"tags": ["category:du-lich-da-nang", "posts", "sitemap"],
-               "paths": {"old": [], "new": ["/category/du-lich-da-nang"]}})
+               "paths": {"old": [], "new": ["/categories/du-lich-da-nang"]}})
     );
 });
 
@@ -133,7 +133,7 @@ db_test!(a_rename_keeps_the_old_slug_and_reports_both, migrate = Migrator, |db: 
     assert_eq!(
         events_now[2].payload,
         json!({"tags": ["category:du-lich-viet-nam", "category:du-lich", "posts", "sitemap"],
-               "paths": {"old": ["/category/du-lich"], "new": ["/category/du-lich-viet-nam"]}})
+               "paths": {"old": ["/categories/du-lich"], "new": ["/categories/du-lich-viet-nam"]}})
     );
 
     // Back to the first slug: it answers again, and the second one redirects.
@@ -157,7 +157,7 @@ db_test!(a_rename_keeps_the_old_slug_and_reports_both, migrate = Migrator, |db: 
     let tag_events = events(db, "tag", tag_id).await;
     assert_eq!(tag_events.iter().map(|e| e.kind.as_str()).collect::<Vec<_>>(), ["tag.created", "tag.updated"]);
     assert_eq!(tag_events[1].payload["tags"], json!(["tag:thu-do", "tag:ha-noi", "posts", "sitemap"]));
-    assert_eq!(tag_events[1].payload["paths"], json!({"old": ["/tag/ha-noi"], "new": ["/tag/thu-do"]}));
+    assert_eq!(tag_events[1].payload["paths"], json!({"old": ["/tags/ha-noi"], "new": ["/tags/thu-do"]}));
 });
 
 db_test!(deleting_records_an_event_and_forgets_old_slugs, migrate = Migrator, |db: TestDb| async move {
@@ -177,7 +177,7 @@ db_test!(deleting_records_an_event_and_forgets_old_slugs, migrate = Migrator, |d
     assert_eq!(last.kind, "category.deleted");
     assert_eq!(
         last.payload,
-        json!({"tags": ["category:moi", "posts", "sitemap"], "paths": {"old": ["/category/moi"], "new": []}})
+        json!({"tags": ["category:moi", "posts", "sitemap"], "paths": {"old": ["/categories/moi"], "new": []}})
     );
 
     let tags = app.admin_api("resources/tags/records");

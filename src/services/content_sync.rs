@@ -6,7 +6,7 @@
 //!
 //! ```json
 //! { "tags": ["category:du-lich", "category:du-lich-cu", "posts", "sitemap"],
-//!   "paths": { "old": ["/category/du-lich-cu"], "new": ["/category/du-lich"] } }
+//!   "paths": { "old": ["/categories/du-lich-cu"], "new": ["/categories/du-lich"] } }
 //! ```
 //!
 //! - `tags`: the cache tags of `docs/api.md` (`category:{slug}`, `tag:{slug}`, `menu:{key}`,
@@ -96,17 +96,31 @@ pub async fn menu_changed(txn: &DatabaseTransaction, change: Change, id: i64, ke
     record_event(txn, &format!("menu.{}", change.as_str()), "menu", Some(id), menu_payload(key)).await
 }
 
+/// The frontend path of a public subject: `/posts/{slug}`, `/{slug}` (a page),
+/// `/categories/{slug}`, `/tags/{slug}`, `/authors/{slug}` (docs/api.md, "Paths"). One place,
+/// shared by the outbox payloads and the Content API's menus and sitemap.
+pub fn public_path(subject_type: &str, slug: &str) -> String {
+    match subject_type {
+        "post" => format!("/posts/{slug}"),
+        "page" => format!("/{slug}"),
+        "category" => format!("/categories/{slug}"),
+        "tag" => format!("/tags/{slug}"),
+        "author" => format!("/authors/{slug}"),
+        other => format!("/{other}/{slug}"),
+    }
+}
+
 /// The payload of a category or tag change (`kind`: `category` or `tag`).
 pub fn taxonomy_payload(kind: &str, change: Change, slug: &str, old_slugs: &[String]) -> Value {
     let mut tags = vec![format!("{kind}:{slug}")];
     let mut old: Vec<String> = Vec::new();
     for previous in old_slugs.iter().filter(|s| s.as_str() != slug) {
         push_unique(&mut tags, format!("{kind}:{previous}"));
-        push_unique(&mut old, format!("/{kind}/{previous}"));
+        push_unique(&mut old, public_path(kind, previous));
     }
     // Posts show their category and tags; the sitemap lists their pages.
     tags.extend(["posts".to_owned(), "sitemap".to_owned()]);
-    let current = format!("/{kind}/{slug}");
+    let current = public_path(kind, slug);
     let new = if change == Change::Deleted {
         push_unique(&mut old, current);
         Vec::new()
@@ -145,7 +159,7 @@ mod tests {
             payload,
             json!({
                 "tags": ["category:du-lich", "category:du-lich-cu", "posts", "sitemap"],
-                "paths": { "old": ["/category/du-lich-cu"], "new": ["/category/du-lich"] }
+                "paths": { "old": ["/categories/du-lich-cu"], "new": ["/categories/du-lich"] }
             })
         );
     }
@@ -155,7 +169,7 @@ mod tests {
         let payload = taxonomy_payload("tag", Change::Deleted, "rust", &[]);
         assert_eq!(
             payload,
-            json!({ "tags": ["tag:rust", "posts", "sitemap"], "paths": { "old": ["/tag/rust"], "new": [] } })
+            json!({ "tags": ["tag:rust", "posts", "sitemap"], "paths": { "old": ["/tags/rust"], "new": [] } })
         );
     }
 

@@ -15,6 +15,9 @@ changes by a **webhook**.
 - Lists: `?page` (from 1) and `?per_page` (default 20, at most 100), answered as
   `{ "data": [...], "meta": { "page", "perPage", "total", "lastPage" } }`, newest first
   (`published_at`, then `id`).
+- Paths: RBlog names each public page of the frontend the same way everywhere (menus, sitemap,
+  webhook): `/posts/{slug}`, `/{slug}` for a page, `/categories/{slug}`, `/tags/{slug}`,
+  `/authors/{slug}`. Map them to your routes if they differ.
 - Errors: RustCMS's envelope `{ "message", "code", "errors" }` with 401, 403, 404, 422, 429.
 
 ## Endpoints
@@ -83,15 +86,15 @@ the change (`src/services/content_sync.rs`). Its payload:
 ```json
 {
   "tags": ["category:du-lich", "category:du-lich-cu", "posts", "sitemap"],
-  "paths": { "old": ["/category/du-lich-cu"], "new": ["/category/du-lich"] }
+  "paths": { "old": ["/categories/du-lich-cu"], "new": ["/categories/du-lich"] }
 }
 ```
 
 - `tags`: what to revalidate, without duplicates. A renamed category or tag lists its new and
   its old slug.
 - `paths.old`: paths that no longer show the content (an old slug, a deleted record);
-  `paths.new`: the paths that show it now. Categories are `/category/{slug}` and tags
-  `/tag/{slug}`; a menu has no path of its own (both lists empty).
+  `paths.new`: the paths that show it now. Categories are `/categories/{slug}` and tags
+  `/tags/{slug}`; a menu has no path of its own (both lists empty).
 
 | Event kind | When | Tags |
 |---|---|---|
