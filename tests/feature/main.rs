@@ -4,6 +4,7 @@
 #[path = "../support/mod.rs"]
 mod support;
 
+mod content_schema;
 mod health;
 mod media_disk;
 // rustcms:tests
