@@ -9,4 +9,5 @@ mod health;
 mod media_disk;
 mod settings;
 mod webhook;
+mod webhook_job;
 // rustcms:tests

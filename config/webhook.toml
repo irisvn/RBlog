@@ -1,0 +1,5 @@
+# Webhook delivery. Settings → Integrations holds the URL and the secret.
+
+# Development only: also deliver over http:// and to loopback addresses (localhost), never to
+# private ranges. The application refuses to boot with `true` when APP_ENV=production.
+allow_insecure_local = false

@@ -10,6 +10,7 @@ mod m20261023_183011_create_revision_tables;
 mod m20261023_183013_create_menu_tables;
 mod m20261023_183014_create_author_profiles_table;
 mod m20261023_183015_create_content_sync_tables;
+mod m20261023_190924_add_delivery_columns_to_content_events;
 // rustcms:migration-mods
 
 pub struct Migrator;
@@ -25,6 +26,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261023_183013_create_menu_tables::Migration),
             Box::new(m20261023_183014_create_author_profiles_table::Migration),
             Box::new(m20261023_183015_create_content_sync_tables::Migration),
+            Box::new(m20261023_190924_add_delivery_columns_to_content_events::Migration),
             // rustcms:migrations
         ];
         migrations.extend(app);
