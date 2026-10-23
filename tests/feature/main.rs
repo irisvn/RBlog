@@ -7,4 +7,5 @@ mod support;
 mod content_schema;
 mod health;
 mod media_disk;
+mod settings;
 // rustcms:tests
