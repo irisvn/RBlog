@@ -98,6 +98,26 @@ pub async fn copy(db: &DatabaseConnection, disks: &Disks, to: &str) -> anyhow::R
             journal(db, &row, to).await?;
         }
     }
+    // Already switched but not cleaned up: a copy on `to` lost since (a recreated bucket) is
+    // restored from the old copy the journal still lists.
+    let mut after = None;
+    loop {
+        let mut query = media_move::Entity::find().filter(media_move::Column::ToDisk.eq(to));
+        if let Some(id) = after {
+            query = query.filter(media_move::Column::MediaId.gt(id));
+        }
+        let moves = query.order_by_asc(media_move::Column::MediaId).limit(BATCH).all(db).await?;
+        let Some(last) = moves.last() else { break };
+        after = Some(last.media_id);
+        for moved in moves {
+            let Some(row) = media::Entity::find_by_id(moved.media_id).one(db).await? else { continue };
+            if row.disk != to || intact(target.as_ref(), &row).await? {
+                continue;
+            }
+            copy_one(disks.get(&moved.from_disk)?.as_ref(), target.as_ref(), &disks.staging, &row).await?;
+            report.copied += 1;
+        }
+    }
     Ok(report)
 }
 

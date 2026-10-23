@@ -210,3 +210,18 @@ db_test!(
         assert!(!s3.exists(&StorageKey::parse(&row.key).unwrap()).await.unwrap());
     }
 );
+
+db_test!(copy_again_restores_a_switched_file_lost_on_the_target, migrate = Migrator, |db: TestDb| async move {
+    let app = support::app(db).await;
+    let db = app.state().db();
+    let (disks, local, s3) = disks();
+    let row = stored(db, local.as_ref(), b"restore me", None).await;
+    media_disk::copy(db, &disks, "s3").await.unwrap();
+    media_disk::switch(db, "s3", &AuditContext::system(None)).await.unwrap();
+    s3.delete(&StorageKey::parse(&row.key).unwrap()).await.unwrap();
+
+    // What cleanup's error message says to run.
+    assert_eq!(media_disk::copy(db, &disks, "s3").await.unwrap(), CopyReport { copied: 1, skipped: 0 });
+    assert!(s3.exists(&StorageKey::parse(&row.key).unwrap()).await.unwrap());
+    assert_eq!(media_disk::cleanup(db, &disks, "s3").await.unwrap(), 1);
+});
