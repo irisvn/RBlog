@@ -64,8 +64,18 @@ Settings → Integrations, **at least once** (retried with backoff):
 - headers `X-RBlog-Event-Id`, `X-RBlog-Timestamp`, and `X-RBlog-Signature` (hex HMAC-SHA256 of
   `timestamp + "." + event_id + "." + body` with the webhook secret). Check it in constant time,
   refuse old timestamps, and ignore an event id already handled;
+  - `Content-Type: application/json`; the timestamp is unix time in seconds, and the signature
+    is lowercase hex over the raw body bytes, so verify before parsing the JSON;
+  - in Rust, `rblog::services::webhook::verify(secret, timestamp, event_id, body, signature)`
+    is the reference check;
 - the body lists the **cache tags** to revalidate (`post:{id}`, `posts`, `category:{slug}`,
-  `tag:{slug}`, `menu:{key}`, `settings`, `sitemap`) and the old and new paths.
+  `tag:{slug}`, `menu:{key}`, `settings`, `sitemap`) and the old and new paths;
+- the URL must be `https://` (no user name or password in it) and resolve only to public
+  addresses: RBlog resolves it at every delivery and refuses loopback, private, link-local and
+  other special ranges, IPv4 and IPv6;
+- answer **2xx** within 10 seconds (5 to connect). Redirects are not followed and count as a
+  failure. RBlog retries timeouts, connection errors, 408, 425, 429 and 5xx; any other answer
+  (3xx, other 4xx) fails the delivery without retrying.
 
 Keep a fallback time-based revalidation (for example 10 minutes) in case the webhook stays
 unreachable.

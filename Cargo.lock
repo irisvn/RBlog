@@ -2935,6 +2935,8 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "hex",
+ "hmac",
+ "reqwest",
  "rustcms",
  "rustcms-testing",
  "sea-orm",

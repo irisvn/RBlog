@@ -6,4 +6,5 @@ mod support;
 
 mod health;
 mod media_disk;
+mod webhook;
 // rustcms:tests
