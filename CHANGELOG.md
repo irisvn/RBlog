@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-24
+
+The first release: the blog admin and its read-only Content API, on RustCMS-Core v0.10.3.
+Image `ghcr.io/irisvn/rblog:0.1.0`; install and update with `docker/compose.production.yml`
+(docs/deployment.md).
+
 ### Version page and production docker compose
 
 - **Integrations → Version** (`/admin/p/version`, new permission `system.version`): what RBlog runs
