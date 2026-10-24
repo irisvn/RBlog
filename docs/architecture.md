@@ -1,7 +1,7 @@
 # Architecture
 
 RBlog is the admin back office of a blog and its read-only Content API: one Rust binary on
-RustCMS-Core (v0.10.1) and MySQL 8.4. The public site is a separate Nuxt/Next app
+RustCMS-Core (v0.10.2) and MySQL 8.4. The public site is a separate Nuxt/Next app
 (docs/frontend-integration.html, docs/api.md). This page says where things live and how a change
 travels from the admin to the public site. The database is described in docs/db-design.html.
 

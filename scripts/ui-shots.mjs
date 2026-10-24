@@ -115,8 +115,8 @@ const SEQUENCES = [
     },
   },
   // Posts: the list and the Schedule dialog of the post RBLOG_SHOT_POST (1, titled
-  // RBLOG_SHOT_POST_TITLE) from its row, then its page (preview slot, revisions) and the tabs of
-  // its edit form. Nothing is saved: the dialog is closed with Escape.
+  // RBLOG_SHOT_POST_TITLE) from its row, then its page (preview slot, revisions) and its edit
+  // form (the editor layout, SEO opened). Nothing is saved: the dialog is closed with Escape.
   {
     path: "/r/posts",
     steps: [
@@ -169,18 +169,21 @@ const SEQUENCES = [
       }, true],
     ],
   },
+  // The editor layout (RustCMS 0.10.2): the page as the window shows it (the sticky aside beside
+  // the main column), then the folded SEO section opened and scrolled to.
+  screen(`/r/posts/records/${env("RBLOG_SHOT_POST", "1")}`, "post-view-layout", false),
   {
     path: `/r/posts/records/${env("RBLOG_SHOT_POST", "1")}/edit`,
     steps: [
+      ["post-edit-layout", async () => {}],
       ["post-edit-content", async () => {}, true],
-      ["post-edit-seo", async (page) => {
-        await page.getByRole("tab", { name: /^SEO$/ }).click();
+      ["post-edit-seo-open", async (page) => {
+        const seo = page.getByRole("button", { name: /^SEO$/ });
+        await seo.click();
         await settle(page);
-      }, true],
-      ["post-edit-publishing", async (page) => {
-        await page.getByRole("tab", { name: /^(Publishing|Xuất bản)$/ }).click();
-        await settle(page);
-      }, true],
+        await page.getByLabel(/^(Meta title|Tiêu đề SEO)/).scrollIntoViewIfNeeded();
+        await settle(page, 300);
+      }],
     ],
   },
   // The rich-text editor (RustCMS 0.10) on RBLOG_SHOT_RICH_POST, a post holding a captioned
@@ -234,7 +237,13 @@ const SEQUENCES = [
       }],
     ],
   },
-  screen(`/r/pages/records/${env("RBLOG_SHOT_PAGE", "1")}/edit`, "page-edit"),
+  {
+    path: `/r/pages/records/${env("RBLOG_SHOT_PAGE", "1")}/edit`,
+    steps: [
+      ["page-edit-layout", async () => {}],
+      ["page-edit", async () => {}, true],
+    ],
+  },
   screen("/r/categories", "categories-list"),
   screen("/r/categories/records/1/edit", "category-edit"),
   screen("/r/tags", "tags-list"),
@@ -251,9 +260,9 @@ const SEQUENCES = [
   screen("/settings/integrations", "settings-integrations"),
 ];
 
-/** A sequence of one full-page shot `name` of `path`. */
-function screen(path, name) {
-  return { path, steps: [[name, async () => {}, true]] };
+/** A sequence of one shot `name` of `path`, of the full page unless `full` is false. */
+function screen(path, name, full = true) {
+  return { path, steps: [[name, async () => {}, full]] };
 }
 
 /** The post form's rich-text editor (its body). */

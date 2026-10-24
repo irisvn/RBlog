@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### RustCMS 0.10.2: an editor layout for posts and pages
+
+- RustCMS-Core v0.10.2 (no migration; admin vocabulary 11). RBlog already sets the theme's
+  success and warning colors, so the new green and amber defaults change nothing here.
+- **Post and page editors** use the whole width of the window, with a main column and an aside
+  that stays in view from 1024 px (below, the aside follows the main column). The tabs Content,
+  SEO and Publishing are gone.
+  - Main column: title, the slug right under it (shown after `/posts/`, or `/` for pages), body,
+    excerpt, and SEO in a section that starts folded.
+  - Aside: Publishing (status and publish date read-only, author; the workflow actions stay in
+    the page header), Cover image, and for posts Organize (category, tags, featured). A new
+    record has no Publishing section yet: the server sets those fields.
+  - The view page lays the record out the same way.
+- `scripts/ui-shots.mjs`: shots `post-edit-layout`, `post-view-layout`, `post-edit-seo-open` and
+  `page-edit-layout` replace `post-edit-seo` and `post-edit-publishing`.
+
 ### RustCMS 0.10.1: row actions, preview action, media settings, alt texts
 
 - RustCMS-Core v0.10.1 (run `rustcms migrate`: it adds `media.alt`; a 0.10.0 binary then needs

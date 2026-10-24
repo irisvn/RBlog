@@ -579,3 +579,94 @@ db_test!(the_lists_place_their_actions_and_columns, migrate = Migrator, |db: Tes
     let schedule = actions.iter().find(|a| a["name"] == json!("schedule")).unwrap();
     assert_eq!(schedule["submitLabel"], json!("Hẹn giờ"));
 });
+
+/// The input or layout of a form schema named `name` (an input) or labelled `name` (a layout).
+fn component<'a>(components: &'a serde_json::Value, name: &str) -> &'a serde_json::Value {
+    components
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["name"] == json!(name) || c["label"] == json!(name))
+        .unwrap_or_else(|| panic!("no {name} in {components}"))
+}
+
+/// The names (inputs) and labels (layouts) of a list of components, in order.
+fn names(components: &serde_json::Value) -> Vec<&str> {
+    components.as_array().unwrap().iter().map(|c| c["name"].as_str().or(c["label"].as_str()).unwrap_or("?")).collect()
+}
+
+db_test!(posts_and_pages_are_edited_in_an_editor_layout, migrate = Migrator, |db: TestDb| async move {
+    let app = content::app(db).await;
+    let (editor, me) = signed_in(&app, "Biên", EDITOR_ROLE).await;
+    let mut post = String::new();
+    for (slug, prefix, aside) in [
+        ("posts", "/posts/", &["Publishing", "Cover image", "Organize"][..]),
+        ("pages", "/", &["Publishing", "Cover image"][..]),
+    ] {
+        let created = editor.post_json(&records(&app, slug, None), &json!({"title": "Phở Hà Nội"})).await;
+        created.assert_status(StatusCode::CREATED);
+        let record = key(&created);
+        if slug == "posts" {
+            post = record.clone();
+        }
+        for operation in ["create", "edit", "view"] {
+            let query = match operation {
+                "create" => "operation=create".to_owned(),
+                _ => format!("operation={operation}&key={record}"),
+            };
+            let schema = editor.get(&app.admin_api(&format!("resources/{slug}/schema?{query}"))).await;
+            schema.assert_status(StatusCode::OK);
+            let form = &schema.json()["form"];
+            // The whole width, one split: the writing in the main column, the details beside it.
+            assert_eq!(form["width"], json!("full"), "{slug} {operation}");
+            let top = form["components"].as_array().unwrap();
+            assert_eq!(top.len(), 1, "{slug} {operation}: {top:?}");
+            assert_eq!(top[0]["type"], json!("split"), "{slug} {operation}");
+            let panes = top[0]["components"].as_array().unwrap();
+            let ids: Vec<&str> = panes.iter().map(|p| p["id"].as_str().unwrap()).collect();
+            assert_eq!(ids, ["main", "aside"], "{slug} {operation}");
+            let (main, side) = (&panes[0]["components"], &panes[1]["components"]);
+            // The slug right under the title, with its path; SEO folded at the end.
+            assert_eq!(names(main), ["title", "slug", "body", "excerpt", "SEO"], "{slug} {operation}");
+            assert_eq!(component(main, "slug")["prefix"], json!(prefix), "{slug} {operation}");
+            let seo = component(main, "SEO");
+            assert_eq!((seo["type"].clone(), seo["collapsed"].clone()), (json!("section"), json!(true)));
+            assert_eq!(names(&seo["components"]), ["meta_title", "meta_description", "canonical_url", "og_media_id"]);
+            // Compact sections in the aside; no tabs anywhere. A new record has no status, date
+            // or author yet (the server sets them), so its form has no Publishing section.
+            let aside = if operation == "create" { &aside[1..] } else { aside };
+            assert_eq!(names(side), aside, "{slug} {operation}");
+            for section in side.as_array().unwrap() {
+                assert_eq!(section["compact"], json!(true), "{slug} {operation}");
+            }
+            if operation != "create" {
+                let publishing = component(side, "Publishing");
+                assert_eq!(names(&publishing["components"]), ["status", "published_at", "author_id"]);
+                // Read-only: only the workflow actions in the page's header change them.
+                for field in ["status", "published_at", "author_id"] {
+                    let input = component(&publishing["components"], field);
+                    assert!(operation == "view" || input["disabled"] == json!(true), "{slug} {field}: {input}");
+                }
+            }
+            if slug == "posts" {
+                // The view page lists the tags in their relation table, not in the form.
+                let organize: &[&str] = if operation == "view" {
+                    &["category_id", "featured"]
+                } else {
+                    &["category_id", "tags", "featured"]
+                };
+                assert_eq!(names(&component(side, "Organize")["components"]), organize, "{operation}");
+            }
+            assert!(!form.to_string().contains("\"tabs\""), "{slug} {operation}");
+        }
+    }
+    // In Vietnamese: the section titles and the slug's help.
+    let vi = app.acting_as(&me).await.languages("vi");
+    let form =
+        vi.get(&app.admin_api(&format!("resources/posts/schema?operation=view&key={post}"))).await.json()["form"]
+            .clone();
+    let panes = &form["components"][0]["components"];
+    assert_eq!(names(&panes[1]["components"]), ["Xuất bản", "Ảnh bìa", "Phân loại"]);
+    assert_eq!(component(&panes[0]["components"], "slug")["help"], json!("Để trống: tạo từ tiêu đề"));
+    assert_eq!(names(&panes[0]["components"])[4], "SEO");
+});
