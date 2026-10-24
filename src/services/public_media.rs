@@ -30,7 +30,6 @@ use sea_orm::{
 use serde_json::Value;
 
 use rustcms::crypto::Keyring;
-use rustcms::settings::Settings;
 
 use crate::models::{author_profile, page, post, public_media};
 use crate::settings::general_settings::GeneralSettings;
@@ -198,12 +197,12 @@ pub async fn backfill(db: &DatabaseConnection, keyring: &Keyring) -> rustcms::Ap
     let mut report = BackfillReport::default();
     {
         let txn = rustcms::db::begin_write(db).await?;
-        // The groups' rows locked first, as a save locks its group's row before its `after_save`
-        // syncs: a save in flight finishes before these reads, and none starts until the commit,
-        // so the rows written here are never those of an older save.
-        for group in [GeneralSettings::GROUP, SeoSettings::GROUP] {
-            rustcms::settings::read(&txn, keyring, group, true).await?;
-        }
+        // A settings save runs under the RBAC lock from its first statement (RustCMS re-checks
+        // the saver's permissions in the write), its `after_save` sync included. Taken first
+        // here too, it serializes this with every save, a group's first one included (no row to
+        // lock yet): the reads below see the last committed save, and none commits until this
+        // does.
+        rustcms::auth::rbac::lock(&txn).await?;
         let general = rustcms::settings::load::<GeneralSettings, _>(&txn, keyring).await?;
         let seo = rustcms::settings::load::<SeoSettings, _>(&txn, keyring).await?;
         sync_settings(&txn, SettingsImages::General, general.logo).await?;

@@ -102,7 +102,9 @@ List items (`GET /posts`, `GET /pages`) carry every field of a single record exc
 - Image URLs are absolute, on `APP_URL`. The last segment is the file name, cosmetic only.
 - `alt` of `cover`, of avatars and of the images in `html` is the document's alternative text,
   else the media library's (Media → the file → Alt text), else `""`. Never the file name.
-  `document` (`?include=document`) stays as stored.
+  `document` (`?include=document`) stays as stored. Editing a file's alt text in the media
+  library sends **no webhook** (the library is RustCMS's, with no hook RBlog could use): the
+  new text shows once the content is revalidated for another reason or its cache expires.
 - `seo.og_image` is the URL of the OG image (a string), or `null`.
 - `author.slug` is `null` when the author has no public profile; `category` is `null` without
   one; `tags` keep the order set in the admin.
