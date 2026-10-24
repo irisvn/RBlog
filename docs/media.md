@@ -1,6 +1,7 @@
 # Media storage
 
-RBlog keeps uploaded media (images from the editor and covers, PDF files) on **one disk**, chosen
+RBlog keeps uploaded media (images from the editor, covers and share images, the site's logo, PDF
+files) on **one disk**, chosen
 when deploying in `config/storage.toml` (RustCMS `[storage]`, see the RustCMS guide
 `digging-deeper/storage.md`):
 
@@ -13,18 +14,30 @@ Every key can come from the environment (`RUSTCMS_STORAGE__DISK=s3`,
 `RUSTCMS_STORAGE__S3__BUCKET=…`). The binary always supports both (Cargo feature `s3`).
 
 Limits: `max_upload_bytes` (10 MiB), `allowed_types` (PNG, JPEG, GIF, WebP, PDF; SVG is never
-accepted). Readers never fetch from the bucket directly: public images are served by RBlog's
-Content API (docs/api.md), which checks that they belong to published content.
+accepted). Some fields narrow them: the logo (Settings → General) takes PNG, WebP or JPEG up to
+1 MB, the default share image (Settings → SEO) an image up to 5 MB. Readers never fetch from the
+bucket directly: public images are served by RBlog's Content API (docs/api.md), which checks that
+they belong to published content or to the public settings.
 
 That check reads the `public_media` table: which published post or page uses which media (a
-post's rows include its author's avatar). Every write that changes what a post or page shows,
-whether it is published, or an author's avatar, recomputes the rows
-(`services::public_media::sync`). To rebuild the whole table (before opening the Content API, or
-if it ever drifted):
+post's rows include its author's avatar), and which images the settings show (subject
+`settings`: the logo and the default share image). Every write that changes what a post or page
+shows, whether it is published, or an author's avatar, recomputes the rows
+(`services::public_media::sync`); saving General or SEO settings rewrites the settings rows
+(`sync_settings`). To rebuild the whole table (before opening the Content API, or if it ever
+drifted):
 
 ```sh
 rblog content:sync-public-media
 ```
+
+## Alternative texts
+
+Each file of the media library has an **Alt text** (Media → the file, the `media.alt` column of
+RustCMS 0.10.1). The Content API uses it for `cover`, `logo`, `seo.og_image`, avatars and the
+images in `html` whenever the document gives no text of its own, and never falls back to the
+file name (docs/api.md, "A post"). Editing it sends no webhook: the new text reaches the public
+site when the content is revalidated for another reason or its cache expires.
 
 ## Trying S3 locally
 

@@ -15,12 +15,12 @@ travels from the admin to the public site. The database is described in docs/db-
 | `src/http/` | `controllers/content/*` (the Content API), `resources/content/*` (its JSON shapes), `requests/` |
 | `src/models/` | SeaORM entities; `post::public_at(now)` is the one definition of "public" |
 | `src/services/` | business rules (below) |
-| `src/policies/` | `content.rs`: the permission matrix for posts and pages, used by the policies, publishing and revisions |
-| `src/admin/` | `resources/` (posts, pages, revisions, categories, tags, menus, authors), `pages/` (settings, Content API), `slots/` (preview), `dashboard.rs` |
-| `src/settings/` | General, Reading, SEO, Integrations; `rules.rs` checks URLs and slugs |
+| `src/policies/` | `content.rs`: the permission matrix for posts and pages, used by `content_policy.rs` (posts, pages), `revision_policy.rs` (their revisions, through the parent), publishing and revisions; `post_author_policy.rs` and `user_lookup_policy.rs` (the author and user lookups) |
+| `src/admin/` | `resources/` (posts, pages and their revisions, categories, tags, menus and menu items, author profiles, and the read-only post-author and user lookups), `pages/` (General, Reading, SEO and Integrations settings, Content API), `slots/` (preview), `dashboard.rs` |
+| `src/settings/` | General, Reading, SEO, Integrations; `rules.rs` checks URLs, paths and slugs |
 | `src/jobs/` | `publish_due`, `deliver_content_event`, `redispatch_content_events` |
 | `src/console/` | `media:move-disk`, `content:sync-public-media` |
-| `src/database/` | migrations, `RoleSeeder`, `ContentApiSeeder`, `DemoSeeder` |
+| `src/database/` | migrations; seeders `DatabaseSeeder` (runs `ContentApiSeeder` and `RoleSeeder`) and `DemoSeeder` (`--class demo`, with the cover images of `demo_images.rs`) |
 | `resources/admin/` | React pages (Content API keys, preview slot, status and option-label cells) and the shared components in `src/rblog/lib/` |
 | `tests/feature/` | one test binary on MySQL (`db_test!`) |
 
@@ -57,7 +57,7 @@ admin form / action / scheduler
             └─ content_sync::record_event         outbox row in content_events
                  └─ events::enqueue               webhook job, same transaction
 commit
-  └─ queue worker: deliver_content_event          signed POST to the frontend, retried 8 times
+  └─ queue worker: deliver_content_event          signed POST to the frontend, up to 8 attempts
   └─ every minute: redispatch_content_events      picks up events whose job was lost
   └─ every minute: publish_due                    scheduled posts that are due → published
 ```
@@ -100,13 +100,17 @@ such a body is saved.
 | Write and tag | ✓ | ✓ | own | own, draft or pending |
 | Publish, schedule, unpublish | ✓ | ✓ | own | – |
 | Trash, restore | ✓ | ✓ | own | own drafts |
-| Pages, categories, tags, menus | ✓ | ✓ | – | – |
+| Delete for good (`posts.force_delete`) | ✓ | ✓ | own | – |
+| Revisions: see, restore | ✓ | ✓ | own posts' | own posts' (restore while draft or pending) |
+| Pages and their revisions, categories, tags, menus | ✓ | ✓ | – | – |
 | Author profiles | ✓ | view | – | – |
 | Upload media / see all media | ✓ / ✓ | ✓ / ✓ | ✓ / ✓ | – / ✓ |
-| Settings, Content API keys, users | ✓ | – | – | – |
+| Settings, Content API keys, users, roles | ✓ | – | – | – |
 
-`rblog db:seed` creates them (`RoleSeeder`); an existing role is never changed. Permissions
-declared after a role was seeded must be granted on the Roles page.
+`rblog db:seed` creates them (`RoleSeeder`, through `RbacService`): the Administrator gets every
+admin permission declared at that moment, the others the lists of
+`src/database/seeders/role_seeder.rs`, which are also the Roles page's presets. An existing role
+is never changed. Permissions declared after a role was seeded must be granted on the Roles page.
 
 ## Tests and CI
 
