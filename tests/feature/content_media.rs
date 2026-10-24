@@ -437,3 +437,30 @@ db_test!(images_without_alt_text_use_the_medias, migrate = Migrator, |db: TestDb
     let listed = reader.get("/api/v1/content/posts").await.json();
     assert_eq!(listed["data"][0]["cover"]["alt"], json!("Phố cổ Hà Nội"));
 });
+
+db_test!(a_body_at_the_size_limit_keeps_its_html_with_the_medias_alt, migrate = Migrator, |db: TestDb| async move {
+    let app = content::app(db).await;
+    let db = app.state().db();
+    let an = author(db, "An", Some("an")).await;
+    let long_alt = "ả".repeat(500);
+    let photo = described(db, &png(&app, "anh.png").await, &long_alt).await;
+    // A stored body just under 256 KiB, with an image without alternative text: filling it in
+    // must not push the document over the limit the editor's input is held to.
+    let document = |text: &str| {
+        json!({"type": "doc", "version": 1, "content": [
+            {"type": "paragraph", "content": [{"type": "text", "text": text}]},
+            {"type": "image", "attrs": {"media": photo.id.to_string(), "alt": ""}},
+        ]})
+    };
+    let overhead = serde_json::to_vec(&document("")).unwrap().len();
+    let body = document(&"a".repeat(rustcms::admin::rich_text::MAX_BYTES - overhead - 10));
+    assert!(rustcms::admin::rich_text::parse(&body).is_ok(), "the stored body is valid");
+    let mut live = new_post(&an, "dai", "Dài", 1);
+    live.body = Set(Some(body));
+    let live = live.insert(db).await.unwrap();
+    sync(db, Subject::Post, live.id).await.unwrap();
+    let reader = content::reader(&app).await;
+    let shown = reader.get("/api/v1/content/posts/dai").await.json();
+    let html = shown["html"].as_str().unwrap();
+    assert!(html.contains(&format!("alt=\"{long_alt}\"")), "{}", &html[html.len().saturating_sub(300)..]);
+});

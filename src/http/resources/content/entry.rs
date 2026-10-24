@@ -170,11 +170,13 @@ impl Shared {
     fn entry(&self, links: &Links<'_>, s: &Source<'_>, detail: Detail) -> EntryJson {
         let image = |id: Option<Uuid>| id.and_then(|id| self.images.get(&id));
         // Images without their own alternative text get the media's (`html` only: `document`
-        // stays as stored).
-        let document = detail
-            .html
-            .then(|| s.body.and_then(|body| rich_text::parse(&with_media_alts(body, &self.images)).ok()))
-            .flatten();
+        // stays as stored). Filled in after parsing, so the stored document's limits are the
+        // only ones it meets.
+        let document =
+            detail.html.then(|| s.body.and_then(|body| rich_text::parse(body).ok())).flatten().map(|mut doc| {
+                fill_media_alts(&mut doc.content, &self.images);
+                doc
+            });
         let html = detail.html.then(|| document.as_ref().map(|doc| self.html(links, doc)).unwrap_or_default());
         let outline = detail.html.then(|| {
             document
@@ -238,31 +240,27 @@ impl Shared {
     }
 }
 
-/// `body` with each image that has no alternative text of its own (missing, `null` or blank)
-/// given its media's ([`media_alt`]) when `images` holds that media, or `""`: the document's text
-/// first, then the library's, then none (never the file name). Nothing else changes.
-fn with_media_alts(body: &Value, images: &HashMap<Uuid, media::Model>) -> Value {
-    fn walk(node: &mut Value, images: &HashMap<Uuid, media::Model>) {
-        let Some(object) = node.as_object_mut() else { return };
-        if object.get("type").and_then(Value::as_str) == Some("image")
-            && let Some(attrs) = object.get_mut("attrs").and_then(Value::as_object_mut)
-        {
-            let blank = attrs.get("alt").and_then(Value::as_str).is_none_or(|alt| alt.trim().is_empty());
-            if blank {
-                let media = attrs.get("media").and_then(Value::as_str).and_then(|id| Uuid::parse_str(id).ok());
-                let alt = media.and_then(|id| images.get(&id)).map(media_alt).unwrap_or_default();
-                attrs.insert("alt".into(), Value::String(alt.to_owned()));
+/// Gives each image of `nodes` that has no alternative text of its own (blank) its media's
+/// ([`media_alt`]) when `images` holds that media, or `""`: the document's text first, then the
+/// library's, then none (never the file name). Images sit in blocks, quotes, lists and callouts
+/// (table cells hold text only).
+fn fill_media_alts(nodes: &mut [rich_text::Node], images: &HashMap<Uuid, media::Model>) {
+    use rich_text::Node;
+    for node in nodes {
+        match node {
+            Node::Image(image) if image.alt.trim().is_empty() => {
+                image.alt = images.get(&image.media).map(media_alt).unwrap_or_default().to_owned();
             }
-        }
-        if let Some(Value::Array(children)) = object.get_mut("content") {
-            for child in children {
-                walk(child, images);
-            }
+            Node::Paragraph(children)
+            | Node::Heading(_, children)
+            | Node::BulletList(children)
+            | Node::OrderedList(children)
+            | Node::ListItem(children)
+            | Node::Blockquote(children)
+            | Node::Callout(_, children) => fill_media_alts(children, images),
+            _ => {}
         }
     }
-    let mut body = body.clone();
-    walk(&mut body, images);
-    body
 }
 
 /// Name and profile slug of each user in `ids`.
