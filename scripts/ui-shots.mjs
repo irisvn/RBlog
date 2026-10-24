@@ -1,4 +1,4 @@
-// Screenshots of RBlog's custom admin pages, for UI reviews (docs/ui-guidelines.md §10): each
+// Screenshots of every RBlog admin screen, for UI reviews (docs/ui-guidelines.md §10): each
 // shot at each width, theme and language, signed in as a super admin of a running panel
 // (`rblog serve`). Uses the installed Google Chrome through playwright-core (nothing is
 // downloaded): run `npm ci` in resources/admin first. Modelled on RDockPanel's script.
@@ -16,6 +16,11 @@
 //   RBLOG_SHOT_SCALE     the device pixel ratio (1)
 //   RBLOG_SHOT_POST      the post whose page and edit form are shot (1), and its title
 //   RBLOG_SHOT_POST_TITLE (Ba ngày ở Đà Nẵng): the list row whose Schedule dialog is shot
+//   RBLOG_SHOT_PAGE      the page whose view (preview slot) and edit form are shot (1)
+//   RBLOG_SHOT_AUTHOR    the author profile (its user id) whose edit form is shot (4)
+//
+// The other screens use the demo data (`rblog db:seed --class demo`). Set General → Public site
+// URL first: without it the preview slot only says that it is missing.
 //
 // The Content API shots make a key named "Shot key" and revoke it again by its id at the end,
 // even when a step fails (a failed revocation fails the run), so no key it made stays usable. Keep the shots out of the repository (the default is /tmp).
@@ -127,11 +132,15 @@ const SEQUENCES = [
     steps: [
       ["post-view", async () => {}, true],
       ["post-preview", async (page) => {
-        const button = page.getByRole("button", { name: /^(Get preview link|Lấy link xem trước)$/ });
-        await button.scrollIntoViewIfNeeded();
-        await button.click();
-        await settle(page, 1000);
+        await getPreviewLink(page);
       }],
+      // A revision of the post, from the last table of its page (Revisions).
+      ["post-revision", async (page) => {
+        await page.getByRole("table").last().getByRole("link", { name: /^(View|Xem)$/ }).first().click();
+        await page.waitForURL(/\/r\/post_revisions\/records\//, { timeout: 8000 });
+        await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
+        await settle(page);
+      }, true],
     ],
   },
   {
@@ -148,7 +157,47 @@ const SEQUENCES = [
       }, true],
     ],
   },
+  // The other generated screens: one full-page shot each (nothing is saved). The preview slot
+  // needs General → Public site URL (and Integrations → Preview path) to show its link.
+  screen("/", "dashboard"),
+  screen("/r/pages", "pages-list"),
+  {
+    path: `/r/pages/records/${env("RBLOG_SHOT_PAGE", "1")}`,
+    steps: [
+      ["page-view", async () => {}, true],
+      ["page-preview", async (page) => {
+        await getPreviewLink(page);
+      }],
+    ],
+  },
+  screen(`/r/pages/records/${env("RBLOG_SHOT_PAGE", "1")}/edit`, "page-edit"),
+  screen("/r/categories", "categories-list"),
+  screen("/r/categories/records/1/edit", "category-edit"),
+  screen("/r/tags", "tags-list"),
+  screen("/r/tags/records/1/edit", "tag-edit"),
+  screen("/r/menus", "menus-list"),
+  screen("/r/menus/records/1", "menu-view"),
+  screen("/r/menu_items/records/1/edit", "menu-item-edit"),
+  screen("/r/authors", "authors-list"),
+  screen(`/r/authors/records/${env("RBLOG_SHOT_AUTHOR", "4")}/edit`, "author-edit"),
+  screen("/settings/general", "settings-general"),
+  screen("/settings/reading", "settings-reading"),
+  screen("/settings/seo", "settings-seo"),
+  screen("/settings/integrations", "settings-integrations"),
 ];
+
+/** A sequence of one full-page shot `name` of `path`. */
+function screen(path, name) {
+  return { path, steps: [[name, async () => {}, true]] };
+}
+
+/** Asks the preview slot for a link (a preview token, valid one hour) and waits for it. */
+async function getPreviewLink(page) {
+  const button = page.getByRole("button", { name: /^(Get preview link|Lấy link xem trước)$/ });
+  await button.scrollIntoViewIfNeeded();
+  await button.click();
+  await settle(page, 1000);
+}
 
 /** Clicks the action `name` of `row`, opening its menu first when it is not a button. */
 async function openAction(page, row, name) {

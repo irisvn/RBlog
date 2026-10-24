@@ -59,6 +59,36 @@ publishes every scheduled post and page that is due, catching up after downtime.
 in `src/services/content_sync.rs`; revisions (`src/services/revisions.rs`, 30 per post or page)
 are listed and restored on the post's page.
 
+### End-to-end smoke test
+
+`scripts/e2e-smoke.mjs` drives the whole publishing path in the installed Google Chrome
+(playwright-core, nothing is downloaded), against a running app with the seeded roles and the demo
+data. It is not run in CI; run it before a release or after a change to publishing, the Content API,
+webhooks or preview:
+
+```sh
+(cd resources/admin && npm ci)
+RUSTCMS_WEBHOOK__ALLOW_INSECURE_LOCAL=true rustcms serve      # only for this run: http://localhost receivers
+RBLOG_E2E_ADMIN_EMAIL=you@example.com RBLOG_E2E_ADMIN_PASSWORD_FILE=~/.rblog-admin node scripts/e2e-smoke.mjs
+```
+
+As a super admin it makes an Editor and a Contributor (`e2e-editor@` and `e2e-contributor@example.com`,
+through the Users API, so `RbacService`), points General → Public site URL and Integrations → Webhook
+at a small local server the script starts, and issues a Content API key. Then the Contributor writes
+a draft, opens the preview link of the preview slot (the local "frontend" asks `/api/v1/preview` for
+it) and submits the draft, without being offered Publish (the server refuses it too); the Editor
+publishes it; the Content API returns it with the key; and the local receiver gets a `post.published`
+webhook whose signature it checks like docs/frontend-integration.html. Each step prints `ok` or `FAIL`.
+Afterwards, even after a failure, it revokes the key, trashes the post, puts the settings back and
+deactivates both users.
+
+- The webhook URL must be empty before the run (the script cannot put back a secret it never saw).
+- Reusing the two users means setting their password, which needs a super admin of every guard
+  (`admin` and `api`). With a super admin of the admin guard only, each run makes its own pair
+  (`e2e-editor+<run>@example.com`), deactivated at the end.
+- `RBLOG_E2E_BASE` (default `http://localhost:8000`) and `RBLOG_E2E_PORT` (the local server's port,
+  default a free one) are optional.
+
 ### Test and CI times
 
 | | Before | After |

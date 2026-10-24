@@ -72,7 +72,8 @@ impl Resource for MenuItemResource {
         Table::new()
             .columns(vec![
                 TextColumn::make("label"),
-                TextColumn::make("kind"),
+                // The option's label, not the stored value (docs/ui-guidelines.md §4).
+                TextColumn::make("kind").cell("rblog/option-label").props(option_labels(&KIND_OPTIONS)),
                 TextColumn::make("parent_id"),
                 TextColumn::make("position"),
             ])
@@ -127,6 +128,11 @@ impl Resource for MenuItemResource {
     async fn after_delete(_ctx: &Ctx, txn: &DatabaseTransaction, deleted: &menu_item::Model) -> AppResult<()> {
         menu_event(txn, deleted.menu_id).await
     }
+}
+
+/// The props of the `rblog/option-label` cell: each value's label (translated by the cell).
+fn option_labels(options: &[(&str, &str)]) -> Value {
+    Value::Object(options.iter().map(|(value, label)| ((*value).to_owned(), Value::from(*label))).collect())
 }
 
 /// A sent `url` is stored trimmed, and a blank one as no URL.

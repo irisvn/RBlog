@@ -79,7 +79,7 @@ impl Resource for PageResource {
                 SelectInput::make("status")
                     .options(STATUS_OPTIONS)
                     .help("Changed with Submit for review, Publish, Schedule and Unpublish"),
-                DateTimePicker::make("published_at").help("Times are in UTC"),
+                DateTimePicker::make("published_at").help("Times are in UTC (Vietnam is UTC+7)"),
                 SelectInput::make("author_id"),
             ]),
         ])])

@@ -86,7 +86,7 @@ impl Resource for PostResource {
                 SelectInput::make("status")
                     .options(STATUS_OPTIONS)
                     .help("Changed with Submit for review, Publish, Schedule and Unpublish"),
-                DateTimePicker::make("published_at").help("Times are in UTC"),
+                DateTimePicker::make("published_at").help("Times are in UTC (Vietnam is UTC+7)"),
                 SelectInput::make("author_id"),
             ]),
         ])])
@@ -100,7 +100,6 @@ impl Resource for PostResource {
                 TextColumn::make("category_id"),
                 TextColumn::make("author_id"),
                 DateColumn::make("published_at"),
-                DateColumn::make("updated_at"),
             ])
             .filters(vec![
                 SelectFilter::make("status").options(STATUS_OPTIONS),
@@ -108,6 +107,8 @@ impl Resource for PostResource {
                 SelectFilter::make("author_id"),
                 TernaryFilter::make("featured"),
             ])
+            // Last updated first. No `updated_at` column: the title needs the room (six columns and
+            // the workflow actions do not fit beside the sidebar).
             .default_sort("-updated_at")
     }
 

@@ -26,6 +26,13 @@ window.rustcms?.registerTranslations?.("vi", {
   Scheduled: "Đã lên lịch",
   Draft: "Nháp",
 
+  // Menu item link types (menu_item_resource.rs, the rblog/option-label cell in content.tsx)
+  URL: "URL",
+  Post: "Bài viết",
+  Page: "Trang",
+  Category: "Danh mục",
+  Tag: "Thẻ",
+
   // Preview of a post or page (content.tsx)
   "See it on the public site as readers will, before it goes live. A link works for one hour.":
     "Xem trên trang công khai đúng như người đọc sẽ thấy, trước khi đăng. Mỗi link dùng được một giờ.",

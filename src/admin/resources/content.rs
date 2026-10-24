@@ -162,11 +162,9 @@ where
             .icon("globe")
             .bulk()
             .requires_confirmation("Publish now? It goes live on the public site."),
-        run("schedule", schedule_at)
-            .ability("publish")
-            .label("Schedule…")
-            .icon("calendar-clock")
-            .form(vec![ActionField::datetime("at").label("Publish at").help("Times are in UTC").required()]),
+        run("schedule", schedule_at).ability("publish").label("Schedule…").icon("calendar-clock").form(vec![
+            ActionField::datetime("at").label("Publish at").help("Times are in UTC (Vietnam is UTC+7)").required(),
+        ]),
         run("unpublish", |_| Ok(Transition::Unpublish))
             .label("Unpublish")
             .icon("eye-off")
