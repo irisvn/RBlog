@@ -65,9 +65,9 @@ impl Resource for AuthorProfileResource {
         Table::new()
             .columns(vec![
                 TextColumn::make("user_id"),
-                TextColumn::make("slug"),
-                TextColumn::make("website"),
-                DateColumn::make("created_at"),
+                TextColumn::make("slug").hide_below(Breakpoint::Sm),
+                TextColumn::make("website").hide_below(Breakpoint::Md),
+                DateColumn::make("created_at").hide_below(Breakpoint::Lg),
             ])
             .default_sort("slug")
     }

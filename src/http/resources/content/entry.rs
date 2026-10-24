@@ -10,7 +10,7 @@ use sea_orm::{ColumnTrait, ConnectionTrait, DbErr, EntityTrait, QueryFilter, Que
 use serde::Serialize;
 use serde_json::Value;
 
-use super::{ImageJson, Links, TermRef, instant};
+use super::{ImageJson, Links, TermRef, instant, media_alt};
 use crate::models::{author_profile, category, page, post, post_tag, tag};
 use crate::services::public_media::body_media_ids;
 
@@ -169,7 +169,14 @@ impl Shared {
 
     fn entry(&self, links: &Links<'_>, s: &Source<'_>, detail: Detail) -> EntryJson {
         let image = |id: Option<Uuid>| id.and_then(|id| self.images.get(&id));
-        let document = detail.html.then(|| s.body.and_then(|body| rich_text::parse(body).ok())).flatten();
+        // Images without their own alternative text get the media's (`html` only: `document`
+        // stays as stored). Filled in after parsing, so the stored document's limits are the
+        // only ones it meets.
+        let document =
+            detail.html.then(|| s.body.and_then(|body| rich_text::parse(body).ok())).flatten().map(|mut doc| {
+                fill_media_alts(&mut doc.content, &self.images);
+                doc
+            });
         let html = detail.html.then(|| document.as_ref().map(|doc| self.html(links, doc)).unwrap_or_default());
         let outline = detail.html.then(|| {
             document
@@ -230,6 +237,29 @@ impl Shared {
             })
             .collect();
         rich_text::to_html_with(doc, &images)
+    }
+}
+
+/// Gives each image of `nodes` that has no alternative text of its own (blank) its media's
+/// ([`media_alt`]) when `images` holds that media, or `""`: the document's text first, then the
+/// library's, then none (never the file name). Images sit in blocks, quotes, lists and callouts
+/// (table cells hold text only).
+fn fill_media_alts(nodes: &mut [rich_text::Node], images: &HashMap<Uuid, media::Model>) {
+    use rich_text::Node;
+    for node in nodes {
+        match node {
+            Node::Image(image) if image.alt.trim().is_empty() => {
+                image.alt = images.get(&image.media).map(media_alt).unwrap_or_default().to_owned();
+            }
+            Node::Paragraph(children)
+            | Node::Heading(_, children)
+            | Node::BulletList(children)
+            | Node::OrderedList(children)
+            | Node::ListItem(children)
+            | Node::Blockquote(children)
+            | Node::Callout(_, children) => fill_media_alts(children, images),
+            _ => {}
+        }
     }
 }
 

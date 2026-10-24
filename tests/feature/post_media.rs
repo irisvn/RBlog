@@ -86,3 +86,86 @@ db_test!(a_preview_link_opens_the_public_sites_preview, migrate = Migrator, |db:
     // A page needs page permissions.
     an.post_json(&app.admin_api("x/previews/pages/1"), &json!({})).await.assert_status(StatusCode::FORBIDDEN);
 });
+
+async fn tokens(app: &TestApp) -> usize {
+    use sea_orm::{EntityTrait, PaginatorTrait};
+    rblog::models::preview_token::Entity::find().count(app.state().db()).await.unwrap() as usize
+}
+
+db_test!(the_preview_action_opens_the_public_sites_preview, migrate = Migrator, |db: TestDb| async move {
+    let app = content::app(db).await;
+    let (an, _) = signed_in(&app, "An", AUTHOR_ROLE).await;
+    let (binh, _) = signed_in(&app, "Bình", AUTHOR_ROLE).await;
+    let admin = {
+        let user = user_with_role(&app, "Quản trị", ADMINISTRATOR_ROLE).await;
+        app.acting_as(&user).await
+    };
+    let key = create(&app, &an, "posts", json!({"title": "Nháp xem trước"})).await;
+    let other = create(&app, &an, "posts", json!({"title": "Nháp khác"})).await;
+
+    // No public site URL yet: a message, no page to open, and no token made.
+    let said = action(&app, &an, "posts", "preview", &[&key], None).await;
+    said.assert_status(StatusCode::OK)
+        .assert_json("/processed", json!([key]))
+        .assert_json("/message", json!("Set the public site URL in Settings → General to preview."));
+    assert_eq!(said.json().get("open"), None);
+    assert_eq!(tokens(&app).await, 0);
+    // A local http site (development) is not opened by the panel either.
+    save_settings(&app, &admin, "general", json!({"frontend_url": "http://localhost:3000"})).await;
+    let said = action(&app, &an, "posts", "preview", &[&key], None).await;
+    said.assert_status(StatusCode::OK);
+    assert!(said.json()["message"].as_str().unwrap().contains("not https"), "{}", said.text());
+    assert_eq!(said.json().get("open"), None);
+    assert_eq!(tokens(&app).await, 0);
+
+    // An https site: the preview opens in a new tab, with a fresh token.
+    save_settings(&app, &admin, "general", json!({"frontend_url": "https://blog.example.com/"})).await;
+    save_settings(&app, &admin, "integrations", json!({"preview_path": "/xem-truoc"})).await;
+    let opened = action(&app, &an, "posts", "preview", &[&key], None).await;
+    opened.assert_status(StatusCode::OK).assert_json("/processed", json!([key]));
+    let url = opened.json()["open"].as_str().unwrap().to_owned();
+    let token = url.strip_prefix("https://blog.example.com/xem-truoc?token=").expect("the frontend's preview route");
+    assert_eq!(token.len(), 43);
+    assert!(opened.json()["message"].as_str().unwrap().contains("new tab"));
+    let shown = app.client().get(&format!("/api/v1/preview?token={token}")).await;
+    shown
+        .assert_status(StatusCode::OK)
+        .assert_json("/preview/status", json!("draft"))
+        .assert_json("/slug", json!("nhap-xem-truoc"));
+    assert_eq!(tokens(&app).await, 1);
+    // In Vietnamese.
+    let vi = {
+        let user = user_with_role(&app, "Chi", AUTHOR_ROLE).await;
+        app.acting_as(&user).await.languages("vi")
+    };
+    let mine = create(&app, &vi, "posts", json!({"title": "Của Chi"})).await;
+    action(&app, &vi, "posts", "preview", &[&mine], None)
+        .await
+        .assert_json("/message", json!("Bản xem trước mở trong tab mới. Liên kết dùng được trong một giờ."));
+
+    // One record at a time: a run on several is refused, and makes no token.
+    let before = tokens(&app).await;
+    let several = action(&app, &an, "posts", "preview", &[&key, &other], None).await;
+    assert_eq!(several.status, StatusCode::UNPROCESSABLE_ENTITY, "{}", several.text());
+    assert_eq!(tokens(&app).await, before);
+    // Another author's post: as if it did not exist.
+    action(&app, &binh, "posts", "preview", &[&key], None).await.assert_json("/missing", json!([key]));
+    assert_eq!(tokens(&app).await, before);
+    // Without `posts.view`, refused before any record is read; pages need page permissions.
+    let lister = crate::support::holding(&app, "lister", &["posts.view_any"]).await;
+    let lister = app.acting_as(&lister).await;
+    action(&app, &lister, "posts", "preview", &[&key], None).await.assert_status(StatusCode::FORBIDDEN);
+    action(&app, &an, "pages", "preview", &["1"], None).await.assert_status(StatusCode::FORBIDDEN);
+    assert_eq!(tokens(&app).await, before);
+    // The action is not offered to whoever lacks `posts.view`.
+    let schema = lister.get(&app.admin_api("resources/posts/schema")).await;
+    if schema.status == StatusCode::OK {
+        let names: Vec<String> = schema.json()["table"]["actions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|a| a["name"].as_str().unwrap().to_owned())
+            .collect();
+        assert!(!names.contains(&"preview".to_owned()), "{names:?}");
+    }
+});

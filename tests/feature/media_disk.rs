@@ -46,6 +46,7 @@ async fn stored(db: &DatabaseConnection, local: &dyn Storage, content: &[u8], sh
         owner_id: Set(1),
         created_at: Set(std::time::SystemTime::now().into()),
         deleted_at: Set(None),
+        alt: Set(None),
     }
     .insert(db)
     .await

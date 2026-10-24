@@ -1,18 +1,15 @@
 //! The admin page of [`ReadingSettings`] (`/admin/settings/reading`): which fields the form
 //! shows and how they are checked.
 
-use rustcms::ValidationErrors;
 use rustcms::admin::{Ctx, SettingField, SettingsMeta, SettingsPage};
-use rustcms::async_trait;
-
-use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
+use rustcms::{AppResult, AppState, ValidationErrors, async_trait};
+use sea_orm::{ColumnTrait, DatabaseTransaction, EntityTrait, PaginatorTrait, QueryFilter};
 
 use crate::models::page;
+use crate::services::content_sync;
 use crate::settings::reading_settings::{HOMEPAGE_LATEST_POSTS, HOMEPAGE_PAGE, ReadingSettings};
 use crate::settings::rules::{checked, filled, is_slug};
 
-// TODO(C1): emit the `settings` outbox event after a save, once RustCMS 0.9 gives
-// `SettingsPage` an after-save hook (0.8.2 has none).
 #[async_trait]
 impl SettingsPage for ReadingSettings {
     fn meta() -> SettingsMeta {
@@ -61,5 +58,16 @@ impl SettingsPage for ReadingSettings {
             None => {}
         }
         checked(errors)
+    }
+
+    /// The public site learns of the change (`settings.updated`, tag `settings`).
+    async fn after_save(
+        _state: &AppState,
+        _ctx: &Ctx,
+        txn: &DatabaseTransaction,
+        _before: &Self,
+        _after: &Self,
+    ) -> AppResult<()> {
+        content_sync::settings_changed(txn).await
     }
 }

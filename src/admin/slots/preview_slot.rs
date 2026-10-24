@@ -3,8 +3,10 @@
 //! `POST …/previews/{posts|pages}/{id}` (`routes::admin`), which checks the record again: the
 //! slot only tells the script which route to call.
 //!
-//! A resource action cannot answer with a value (an action's handler returns nothing but its
-//! outcome), so the link comes from an admin route instead.
+//! The Preview action of the same records (`admin::resources::content::preview_action`) opens a
+//! fresh link in one click; this card stays for what an action cannot show: the link itself, to
+//! copy and send, and when it stops working. Both issue the link through
+//! `services::preview::issue_link_in`.
 
 use rustcms::admin::{Ctx, Envelope, PageView, PanelSlot, Placement, SlotMeta};
 use rustcms::{AppResult, async_trait};

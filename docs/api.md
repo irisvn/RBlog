@@ -45,7 +45,7 @@ changes by a **webhook**.
 | `GET /tags`, `GET /tags/{slug}` | `{id, slug, name, description, post_count}`; old slugs redirect |
 | `GET /authors/{slug}` | `{slug, name, bio, website, avatar}`; 404 for an author without a published post |
 | `GET /menus/{key}` | `primary`, `footer`: `{key, name, items}`, links resolved (only to published content) |
-| `GET /settings` | the public site settings (name, description, language, frontend URL, posts per page, SEO defaults, social links, homepage) |
+| `GET /settings` | the public site settings (name, description, language, frontend URL, posts per page, logo, SEO defaults, social links, homepage): see [Settings](#settings) |
 | `GET /sitemap?type=post&after=<cursor>` | `{type, path, lastmod}` in batches of 1000, for the frontend's sitemap |
 | `GET /api/v1/preview?token=<token>` | a draft, for the frontend's preview route (short-lived token, `no-store`), no key needed |
 | `GET /api/v1/preview/media/{id}?token=<token>` | an image of that draft |
@@ -100,7 +100,11 @@ List items (`GET /posts`, `GET /pages`) carry every field of a single record exc
 - `outline` lists the body's headings in order, `{level, text, id}`, `id` being the `id` of
   that heading in `html`: a table of contents. `[]` without headings.
 - Image URLs are absolute, on `APP_URL`. The last segment is the file name, cosmetic only.
-- `cover.alt` is the media's file name until media get alt texts.
+- `alt` of `cover`, of avatars and of the images in `html` is the document's alternative text,
+  else the media library's (Media → the file → Alt text), else `""`. Never the file name.
+  `document` (`?include=document`) stays as stored. Editing a file's alt text in the media
+  library sends **no webhook** (the library is RustCMS's, with no hook RBlog could use): the
+  new text shows once the content is revalidated for another reason or its cache expires.
 - `seo.og_image` is the URL of the OG image (a string), or `null`.
 - `author.slug` is `null` when the author has no public profile; `category` is `null` without
   one; `tags` keep the order set in the admin.
@@ -164,6 +168,33 @@ Rendering `html` needs nothing else. The elements below are the new part of its 
   version).
 - Search (`q`) and `reading_minutes` count the text of table cells, callouts and image captions;
   embeds and image alt texts add nothing.
+
+## Settings
+
+```json
+{
+  "site_name": "RBlog",
+  "description": "…",
+  "site_language": "vi",
+  "frontend_url": "https://blog.example.com",
+  "posts_per_page": 10,
+  "logo": { "url": "https://cms.example.com/api/v1/media/…/logo.png", "width": 512, "height": 512, "alt": "…" },
+  "seo": {
+    "meta_title": "…",
+    "meta_description": "…",
+    "og_image": { "url": "https://cms.example.com/api/v1/media/…/og.jpg", "width": 1200, "height": 630, "alt": "…" },
+    "social_links": { "github": "https://github.com/…" }
+  },
+  "homepage": { "shows": "latest_posts", "page_slug": null }
+}
+```
+
+- `logo` and `seo.og_image` are images like `cover` (`{url, width, height, alt}`), or `null`: not
+  chosen, in the trash, or not an image.
+- Until RBlog 0.1 the share image was an address, `seo.og_image_url`. That field is gone. A site
+  that saved one and has not chosen a share image yet gets it as
+  `seo.og_image = {url, width: null, height: null, alt: ""}`.
+- Saving General, Reading or SEO sends a `settings.updated` webhook (tag `settings`).
 
 ## Menus
 

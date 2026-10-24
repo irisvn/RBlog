@@ -207,6 +207,10 @@ fn every_hook_message_speaks_vietnamese() {
     translator.add("vi", include_str!("../../lang/vi.toml")).unwrap();
     let mut messages = menus::MESSAGES.to_vec();
     messages.extend([rblog::services::taxonomy::SLUG_WITHOUT_LETTERS, "is already taken"]);
+    {
+        use rblog::admin::resources::content::*;
+        messages.extend([PREVIEW_OPENS, PREVIEW_NEEDS_SITE, PREVIEW_NOT_HTTPS, PREVIEW_ONE_AT_A_TIME]);
+    }
     let missing: Vec<&str> = messages.into_iter().filter(|m| translator.find("vi", None, m).is_none()).collect();
     assert!(missing.is_empty(), "not in lang/vi.toml: {missing:?}");
 }

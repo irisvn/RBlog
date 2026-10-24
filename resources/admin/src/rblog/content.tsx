@@ -2,7 +2,8 @@
 // §4: a dot and a word), the option-label cell of other lists (`rblog/option-label`: a stored
 // value shown as its label, from the column's props) and the preview slot of their record pages
 // (`rblog/content-preview`), which asks `routes::admin` (`/previews/{posts|pages}/{id}`) for a link to the public site's
-// preview route. The server checks who may preview the record.
+// preview route, to copy and with its expiry. The rows' and pages' Preview action opens such a link in one
+// click (server side, `admin::resources::content::preview_action`). The server checks who may preview the record.
 import { useState } from "react";
 import { registerCell, registerSlot, useAdminMutation, type CellProps, type SlotProps } from "@rustcms/admin-sdk";
 import { ApiError } from "@rustcms/admin-sdk/host";

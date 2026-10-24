@@ -5,6 +5,7 @@
 use std::ops::RangeInclusive;
 
 use rustcms::settings::Settings;
+use sea_orm::prelude::Uuid;
 use serde::{Deserialize, Serialize};
 
 use super::rules::{filled, without_trailing_slash};
@@ -22,6 +23,8 @@ pub struct GeneralSettings {
     /// Where the public site is served; read it with [`GeneralSettings::frontend_url`].
     pub frontend_url: Option<String>,
     pub posts_per_page: i32,
+    /// The site's logo: an image of the media library (PNG, WebP or JPEG).
+    pub logo: Option<Uuid>,
 }
 
 impl Default for GeneralSettings {
@@ -32,6 +35,7 @@ impl Default for GeneralSettings {
             site_language: "vi".into(),
             frontend_url: None,
             posts_per_page: 10,
+            logo: None,
         }
     }
 }

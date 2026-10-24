@@ -252,3 +252,119 @@ db_test!(a_local_webhook_is_refused_without_the_flag, migrate = Migrator, |db: T
     let local = json!({ "webhook_url": "http://localhost:3000/api/revalidate", "webhook_secret": SECRET });
     save(&app, &admin, "integrations", local).await.assert_status(StatusCode::UNPROCESSABLE_ENTITY);
 });
+
+/// The kinds of the outbox events about the settings, oldest first.
+async fn settings_events(app: &TestApp) -> Vec<(String, Value)> {
+    use rblog::models::content_event;
+    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
+    content_event::Entity::find()
+        .filter(content_event::Column::SubjectType.eq("settings"))
+        .order_by_asc(content_event::Column::Id)
+        .all(app.state().db())
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|e| (e.kind, e.payload))
+        .collect()
+}
+
+db_test!(saving_public_settings_tells_the_public_site, migrate = Migrator, |db: TestDb| async move {
+    let app = support::app(db).await;
+    let admin = admin(&app).await;
+    let changes = [
+        ("general", json!({ "site_name": "Blog của An" })),
+        ("reading", json!({ "homepage_shows": "page", "homepage_page_slug": "gioi-thieu" })),
+        ("seo", json!({ "meta_title": "Blog của An" })),
+    ];
+    let payload = json!({ "tags": ["settings"], "paths": { "old": [], "new": [] } });
+    for (count, (group, data)) in changes.into_iter().enumerate() {
+        save(&app, &admin, group, data.clone()).await.assert_status(StatusCode::OK);
+        let events = settings_events(&app).await;
+        assert_eq!(events.len(), count + 1, "{group}");
+        assert_eq!(events[count], ("settings.updated".to_owned(), payload.clone()), "{group}");
+        // A save that changes nothing records nothing.
+        save(&app, &admin, group, data).await.assert_status(StatusCode::OK);
+        assert_eq!(settings_events(&app).await.len(), count + 1, "{group} unchanged");
+    }
+    // Integrations are not public: no event.
+    save(&app, &admin, "integrations", json!({ "preview_path": "/xem-truoc" })).await.assert_status(StatusCode::OK);
+    assert_eq!(settings_events(&app).await.len(), 3);
+});
+
+db_test!(the_logo_and_share_image_are_public_media, migrate = Migrator, |db: TestDb| async move {
+    use crate::support::content::{self, APP_URL};
+    use rblog::models::public_media;
+    use rblog::services::public_media::backfill;
+    use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
+
+    let app = content::app(db).await;
+    let db = app.state().db();
+    let admin = admin(&app).await;
+    let logo = content::stored_media(&app, "logo.png", "image/png", b"\x89PNG logo").await;
+    let og = content::stored_media(&app, "chia se.jpg", "image/jpeg", b"\xff\xd8\xff og").await;
+    let pdf = content::stored_media(&app, "menu.pdf", "application/pdf", b"%PDF-1.7").await;
+    let mut described: rustcms::admin::media::entity::ActiveModel = og.clone().into();
+    described.alt = Set(Some("Hồ Gươm lúc bình minh".into()));
+    let og = described.update(db).await.unwrap();
+    let public = app.client();
+    let served = async |id: &sea_orm::prelude::Uuid| public.get(&format!("/api/v1/media/{id}/a.png")).await.status;
+    assert_eq!(served(&logo.id).await, StatusCode::NOT_FOUND);
+
+    // A PDF is neither a logo nor a share image.
+    save(&app, &admin, "general", json!({ "logo": pdf.id.to_string() })).await.assert_validation_error("logo");
+    save(&app, &admin, "seo", json!({ "og_image": pdf.id.to_string() })).await.assert_validation_error("og_image");
+
+    // Before any image is chosen, an address saved by RBlog 0.1 is the share image.
+    save(&app, &admin, "seo", json!({ "og_image_url": "https://cdn.example.com/og.png" }))
+        .await
+        .assert_status(StatusCode::OK);
+    let settings = serde_json::to_value(public_settings(app.state()).await.unwrap()).unwrap();
+    assert_eq!(settings["logo"], json!(null));
+    assert_eq!(
+        settings["seo"]["og_image"],
+        json!({ "url": "https://cdn.example.com/og.png", "width": null, "height": null, "alt": "" })
+    );
+
+    save(&app, &admin, "general", json!({ "logo": logo.id.to_string() })).await.assert_status(StatusCode::OK);
+    save(&app, &admin, "seo", json!({ "og_image": og.id.to_string() })).await.assert_status(StatusCode::OK);
+    let settings = serde_json::to_value(public_settings(app.state()).await.unwrap()).unwrap();
+    assert_eq!(
+        settings["logo"],
+        json!({ "url": format!("{APP_URL}/api/v1/media/{}/logo.png", logo.id), "width": 1600, "height": 900, "alt": "" })
+    );
+    // The chosen image wins over the old address, with its alternative text.
+    assert_eq!(
+        settings["seo"]["og_image"],
+        json!({
+            "url": format!("{APP_URL}/api/v1/media/{}/chia-se.jpg", og.id),
+            "width": 1600,
+            "height": 900,
+            "alt": "Hồ Gươm lúc bình minh",
+        })
+    );
+    assert!(settings["seo"].get("og_image_url").is_none(), "{settings}");
+    // Served publicly, also through the Content API.
+    assert_eq!(served(&logo.id).await, StatusCode::OK);
+    assert_eq!(served(&og.id).await, StatusCode::OK);
+    let reader = content::reader(&app).await;
+    let api = reader.get("/api/v1/content/settings").await;
+    api.assert_status(StatusCode::OK).assert_json("/logo/url", settings["logo"]["url"].clone());
+
+    // A replaced or cleared image is private again.
+    let other = content::stored_media(&app, "logo-2.webp", "image/webp", b"RIFF....WEBP").await;
+    save(&app, &admin, "general", json!({ "logo": other.id.to_string() })).await.assert_status(StatusCode::OK);
+    assert_eq!(served(&logo.id).await, StatusCode::NOT_FOUND);
+    save(&app, &admin, "general", json!({ "logo": null })).await.assert_status(StatusCode::OK);
+    assert_eq!(served(&other.id).await, StatusCode::NOT_FOUND);
+    assert_eq!(serde_json::to_value(public_settings(app.state()).await.unwrap()).unwrap()["logo"], json!(null));
+
+    // The backfill rebuilds the rows of the settings too.
+    public_media::Entity::delete_many().exec(db).await.unwrap();
+    assert_eq!(served(&og.id).await, StatusCode::NOT_FOUND);
+    backfill(db, app.state().keyring()).await.unwrap();
+    assert_eq!(served(&og.id).await, StatusCode::OK);
+    let rows =
+        public_media::Entity::find().filter(public_media::Column::SubjectType.eq("settings")).all(db).await.unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!((rows[0].media_id, rows[0].subject_id), (og.id, 2));
+});

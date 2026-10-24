@@ -121,11 +121,30 @@ const SEQUENCES = [
     path: "/r/posts",
     steps: [
       ["posts-list", async () => {}, true],
+      // The row's ⋯ menu: the transitions that apply to it, Preview, Unpublish last.
+      ["posts-row-menu", async (page) => {
+        const row = page.getByRole("row").filter({ hasText: env("RBLOG_SHOT_POST_TITLE", "Ba ngày ở Đà Nẵng") }).first();
+        await row.getByRole("button", { name: /^(More actions for|Thao tác khác cho) / }).click();
+        await settle(page);
+      }],
       ["post-schedule", async (page) => {
+        await page.keyboard.press("Escape");
+        await settle(page, 300);
         const row = page.getByRole("row").filter({ hasText: env("RBLOG_SHOT_POST_TITLE", "Ba ngày ở Đà Nẵng") }).first();
         await openAction(page, row, /^(Schedule…|Hẹn giờ…)$/);
         await dialog(page).waitFor({ timeout: 5000 });
         await settle(page);
+      }],
+      // The row's Preview action: a new tab (closed here) and its notice with the link.
+      ["post-preview-action", async (page) => {
+        await page.keyboard.press("Escape");
+        await settle(page, 300);
+        const row = page.getByRole("row").filter({ hasText: env("RBLOG_SHOT_POST_TITLE", "Ba ngày ở Đà Nẵng") }).first();
+        const popup = page.context().waitForEvent("page", { timeout: 5000 }).catch(() => null);
+        await openAction(page, row, /^(Preview|Xem trước)$/);
+        const tab = await popup;
+        await tab?.close();
+        await settle(page, 1000);
       }],
     ],
   },
@@ -135,6 +154,11 @@ const SEQUENCES = [
       ["post-view", async () => {}, true],
       ["post-preview", async (page) => {
         await getPreviewLink(page);
+      }],
+      // Its Revisions table: Restore this version is each row's labelled action.
+      ["post-revisions", async (page) => {
+        await page.getByRole("table").last().scrollIntoViewIfNeeded();
+        await settle(page);
       }],
       // A revision of the post, from the last table of its page (Revisions).
       ["post-revision", async (page) => {
@@ -220,6 +244,7 @@ const SEQUENCES = [
   screen("/r/menu_items/records/1/edit", "menu-item-edit"),
   screen("/r/authors", "authors-list"),
   screen(`/r/authors/records/${env("RBLOG_SHOT_AUTHOR", "4")}/edit`, "author-edit"),
+  screen("/r/media", "media-library"),
   screen("/settings/general", "settings-general"),
   screen("/settings/reading", "settings-reading"),
   screen("/settings/seo", "settings-seo"),
@@ -244,14 +269,14 @@ async function getPreviewLink(page) {
   await settle(page, 1000);
 }
 
-/** Clicks the action `name` of `row`, opening its menu first when it is not a button. */
+/** Clicks the action `name` of `row`, opening its ⋯ menu first when it is not a button. */
 async function openAction(page, row, name) {
   const direct = row.getByRole("button", { name });
   if (await direct.count()) {
     await direct.first().click();
     return;
   }
-  await row.getByRole("button").last().click();
+  await row.getByRole("button", { name: /^(More actions for|Thao tác khác cho) / }).click();
   await settle(page, 300);
   await page.getByRole("menuitem", { name }).click();
 }

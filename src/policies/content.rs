@@ -9,8 +9,13 @@
 //!   are for editors);
 //! - **state**: without `posts.publish` (a contributor), a post can be edited, re-tagged or
 //!   submitted only while it is a draft or pending, and trashed, restored or deleted only while it
-//!   is a draft; transitions apply only from the states they leave (`submit`: draft; `publish`,
-//!   which also schedules: draft, pending or scheduled; `unpublish`: published or scheduled).
+//!   is a draft.
+//!
+//! Which states a transition leaves (`submit`: draft; `publish`, which also schedules: draft,
+//! pending or scheduled; `unpublish`: published or scheduled) is not decided here but by
+//! `services::publishing::Transition::applies`: the resources offer each workflow action only
+//! where it applies (`Action::visible_when`, so a run on one record it does not apply to is a
+//! 403), and `publishing::transition` refuses it again on the locked row.
 //!
 //! Visibility is the resources' `scope()`: without `posts.view_all`, a user sees only the posts
 //! they wrote ([`sees_all`]).
@@ -121,11 +126,10 @@ pub fn allows(ctx: &Ctx, kind: Kind, ability: &str, record: Option<&Facts>) -> b
         "view" => own || sees_all(ctx, kind),
         "update" | "attach_tags" | "detach_tags" => mine_or_allowed && editable,
         "delete" | "restore" | "force_delete" => mine_or_allowed && (publishes || status == Some(PostStatus::Draft)),
-        "submit" => mine_or_allowed && editable && status == Some(PostStatus::Draft),
-        "publish" => {
-            mine_or_allowed && matches!(status, Some(PostStatus::Draft | PostStatus::Pending | PostStatus::Scheduled))
-        }
-        "unpublish" => mine_or_allowed && matches!(status, Some(PostStatus::Published | PostStatus::Scheduled)),
+        // Which states a transition leaves is `publishing::Transition::applies`, checked by the
+        // actions' `visible_when` and by `publishing::transition`: here only who.
+        "submit" => mine_or_allowed && editable,
+        "publish" | "unpublish" => mine_or_allowed,
         "create" => true,
         _ => false,
     }

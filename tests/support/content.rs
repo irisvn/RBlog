@@ -143,6 +143,7 @@ pub async fn stored_media(app: &TestApp, name: &str, mime: &str, content: &[u8])
         owner_id: Set(1),
         created_at: Set(ago(0)),
         deleted_at: Set(None),
+        alt: Set(None),
     }
     .insert(app.state().db())
     .await

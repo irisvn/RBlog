@@ -246,3 +246,39 @@ db_test!(page_revisions_follow_their_page, migrate = Migrator, |db: TestDb| asyn
         .await
         .assert_status(StatusCode::FORBIDDEN);
 });
+
+db_test!(the_revisions_table_restores_a_version_from_its_row, migrate = Migrator, |db: TestDb| async move {
+    let app = content::app(db).await;
+    let db = app.state().db();
+    let (editor, _) = signed_in(&app, "Biên", EDITOR_ROLE).await;
+    let (contributor, _) = signed_in(&app, "Chi", CONTRIBUTOR_ROLE).await;
+    for (slug, revisions) in [("posts", "post_revisions"), ("pages", "page_revisions")] {
+        let key = create(&app, &editor, slug, json!({"title": "Bản đầu"})).await;
+        update(&app, &editor, slug, &key, json!({"title": "Bản sau"})).await.assert_status(StatusCode::OK);
+        // The post's Revisions table: its rows offer Restore, the related resource's action,
+        // labelled (primary) on each row.
+        let relation = app.admin_api(&format!("resources/{slug}/records/{key}/relations/revisions"));
+        let listed = editor.get(&relation).await;
+        listed.assert_status(StatusCode::OK);
+        let listed = listed.json();
+        let rows = listed["data"].as_array().unwrap();
+        assert_eq!(rows.len(), 2, "{slug}");
+        assert!(rows.iter().all(|r| r["abilities"]["restore_version"] == json!(true)), "{slug}: {listed}");
+        let schema = editor.get(&app.admin_api(&format!("resources/{revisions}/schema?operation=view"))).await;
+        let schema = schema.json();
+        let restore = &schema["table"]["actions"][0];
+        assert_eq!((&restore["name"], &restore["primary"]), (&json!("restore_version"), &json!(true)), "{slug}");
+        // Run from the row as the panel does: the related resource's action route.
+        let oldest = rows.iter().find(|r| r["data"]["title"] == json!("Bản đầu")).unwrap()["key"].as_str().unwrap();
+        run(&app, &editor, revisions, "restore_version", oldest, None).await;
+        let title = match slug {
+            "posts" => post_row(db, &key).await.title,
+            _ => page_row(db, &key).await.title,
+        };
+        assert_eq!(title, "Bản đầu", "{slug}");
+    }
+    // Another author's post, and so its Revisions table, does not exist for a contributor.
+    let theirs = create(&app, &editor, "posts", json!({"title": "Của Biên"})).await;
+    let relation = app.admin_api(&format!("resources/posts/records/{theirs}/relations/revisions"));
+    contributor.get(&relation).await.assert_status(StatusCode::NOT_FOUND);
+});

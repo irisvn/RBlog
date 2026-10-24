@@ -129,9 +129,9 @@ db_test!(public_media_follows_what_is_published, migrate = Migrator, |db: TestDb
     trashed.deleted_at = Set(Some(ago(0)));
     let about = trashed.update(db).await.unwrap();
 
-    let report = backfill(db).await.unwrap();
+    let report = backfill(db, app.state().keyring()).await.unwrap();
     assert_eq!(report.orphans, 3);
-    assert_eq!(report.subjects, 3, "two posts and a page");
+    assert_eq!(report.subjects, 5, "two posts, a page and the two settings groups with images");
     assert_eq!(rows(db, Subject::Post, live.id).await, BTreeSet::from([cover, new_avatar]));
     assert_eq!(rows(db, Subject::Post, draft.id).await, BTreeSet::new());
     assert_eq!(rows(db, Subject::Page, about.id).await, BTreeSet::new());
@@ -194,7 +194,11 @@ db_test!(published_images_are_public_and_others_are_not, migrate = Migrator, |db
         ))
     );
     let photo_url = format!("{APP_URL}/api/v1/media/{}/nh-b-a.png", photo.id);
-    assert_eq!(shown["cover"], json!({"url": photo_url, "width": 1600, "height": 900, "alt": "ảnh bìa.png"}));
+    assert_eq!(
+        shown["cover"],
+        json!({"url": photo_url, "width": 1600, "height": 900, "alt": ""}),
+        "no alt text: never the file name"
+    );
     assert_eq!(shown["seo"]["og_image"], json!(null), "a PDF is not an image");
     let listed = reader.get("/api/v1/content/posts").await.json();
     assert_eq!(listed["data"][0]["cover"]["url"], json!(photo_url));
@@ -374,4 +378,89 @@ db_test!(preview_tokens_show_one_subject_and_its_images, migrate = Migrator, |db
     }
     assert_private(&client.get("/api/v1/preview").await, StatusCode::NOT_FOUND);
     assert_private(&client.get(&format!("/api/v1/preview/media/{}", cover.id)).await, StatusCode::NOT_FOUND);
+});
+
+/// `media` with the alternative text `alt`, as Media → the file → Alt text saves it.
+async fn described(db: &DatabaseConnection, media: &media::Model, alt: &str) -> media::Model {
+    let mut edited: media::ActiveModel = media.clone().into();
+    edited.alt = Set(Some(alt.into()));
+    edited.update(db).await.unwrap()
+}
+
+db_test!(images_without_alt_text_use_the_medias, migrate = Migrator, |db: TestDb| async move {
+    let app = content::app(db).await;
+    let db = app.state().db();
+    let an = author(db, "An", Some("an")).await;
+    let cover = described(db, &png(&app, "bia.png").await, "Phố cổ Hà Nội").await;
+    let plain = png(&app, "khong-mo-ta.png").await;
+    let described_body = described(db, &png(&app, "than-bai.png").await, "Mô tả trong thư viện").await;
+    let written = described(db, &png(&app, "co-san.png").await, "Không dùng").await;
+    let blank = described(db, &png(&app, "trong.png").await, "   ").await;
+
+    let image = |media: &media::Model, alt: Option<&str>| match alt {
+        Some(alt) => json!({"type": "image", "attrs": {"media": media.id.to_string(), "alt": alt}}),
+        None => json!({"type": "image", "attrs": {"media": media.id.to_string()}}),
+    };
+    let document = json!({"type": "doc", "version": 1, "content": [
+        image(&described_body, Some("")),
+        image(&described_body, None),
+        image(&written, Some("Bức ảnh của bài")),
+        image(&plain, Some("")),
+        image(&blank, Some(" ")),
+        {"type": "blockquote", "content": [image(&described_body, Some(" "))]},
+    ]});
+    let mut live = new_post(&an, "live", "Live", 1);
+    live.cover_media_id = Set(Some(cover.id));
+    live.og_media_id = Set(Some(plain.id));
+    live.body = Set(Some(document.clone()));
+    let live = live.insert(db).await.unwrap();
+    sync(db, Subject::Post, live.id).await.unwrap();
+
+    let reader = content::reader(&app).await;
+    let shown = reader.get("/api/v1/content/posts/live?include=document").await;
+    shown.assert_status(StatusCode::OK);
+    let shown = shown.json();
+    // The cover: the media's alternative text; never the file name.
+    assert_eq!(shown["cover"]["alt"], json!("Phố cổ Hà Nội"));
+    // The body: the document's text first, then the media's, then nothing.
+    let html = shown["html"].as_str().unwrap();
+    let alts: Vec<&str> = html.split(" alt=\"").skip(1).map(|rest| rest.split('"').next().unwrap()).collect();
+    assert_eq!(
+        alts,
+        ["Mô tả trong thư viện", "Mô tả trong thư viện", "Bức ảnh của bài", "", "", "Mô tả trong thư viện"],
+        "{html}"
+    );
+    assert!(!html.contains("alt=\"khong-mo-ta.png\""), "no file name as alt: {html}");
+    // `document` stays as stored.
+    assert_eq!(shown["document"], document);
+    // A list item and the author's avatar follow the same rule.
+    let listed = reader.get("/api/v1/content/posts").await.json();
+    assert_eq!(listed["data"][0]["cover"]["alt"], json!("Phố cổ Hà Nội"));
+});
+
+db_test!(a_body_at_the_size_limit_keeps_its_html_with_the_medias_alt, migrate = Migrator, |db: TestDb| async move {
+    let app = content::app(db).await;
+    let db = app.state().db();
+    let an = author(db, "An", Some("an")).await;
+    let long_alt = "ả".repeat(500);
+    let photo = described(db, &png(&app, "anh.png").await, &long_alt).await;
+    // A stored body just under 256 KiB, with an image without alternative text: filling it in
+    // must not push the document over the limit the editor's input is held to.
+    let document = |text: &str| {
+        json!({"type": "doc", "version": 1, "content": [
+            {"type": "paragraph", "content": [{"type": "text", "text": text}]},
+            {"type": "image", "attrs": {"media": photo.id.to_string(), "alt": ""}},
+        ]})
+    };
+    let overhead = serde_json::to_vec(&document("")).unwrap().len();
+    let body = document(&"a".repeat(rustcms::admin::rich_text::MAX_BYTES - overhead - 10));
+    assert!(rustcms::admin::rich_text::parse(&body).is_ok(), "the stored body is valid");
+    let mut live = new_post(&an, "dai", "Dài", 1);
+    live.body = Set(Some(body));
+    let live = live.insert(db).await.unwrap();
+    sync(db, Subject::Post, live.id).await.unwrap();
+    let reader = content::reader(&app).await;
+    let shown = reader.get("/api/v1/content/posts/dai").await.json();
+    let html = shown["html"].as_str().unwrap();
+    assert!(html.contains(&format!("alt=\"{long_alt}\"")), "{}", &html[html.len().saturating_sub(300)..]);
 });

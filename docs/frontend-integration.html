@@ -286,7 +286,7 @@ export default defineCachedEventHandler(
   "excerpt": "…",
   "html": "&lt;h2 id=\"gioi-thieu\"&gt;Giới thiệu&lt;/h2&gt;&lt;p&gt;…&lt;/p&gt;",
   "outline": [{ "level": 2, "text": "Giới thiệu", "id": "gioi-thieu" }],
-  "cover": { "url": "https://cms.example.com/api/v1/media/…/cover.jpg", "width": 1600, "height": 900, "alt": "cover.jpg" },
+  "cover": { "url": "https://cms.example.com/api/v1/media/…/cover.jpg", "width": 1600, "height": 900, "alt": "Phố cổ Hà Nội" },
   "category": { "slug": "du-lich", "name": "Du lịch" },
   "tags": [{ "slug": "ha-noi", "name": "Hà Nội" }],
   "author": { "slug": "an", "name": "An" },
@@ -301,6 +301,7 @@ export default defineCachedEventHandler(
         <li><strong><code>outline</code></strong> là danh sách heading của bài theo thứ tự, <code>{level, text, id}</code>, với <code>id</code> trùng <code>id</code> của heading trong <code>html</code>: dùng làm mục lục (mục 06).</li>
         <li><strong>Slug cũ</strong>: API trả 200 <code>{"redirect": "slug-mới"}</code>. Frontend chuyển hướng 301 sang đường dẫn mới để giữ SEO.</li>
         <li><strong>Trường có thể null</strong>: <code>cover</code>, <code>category</code>, <code>seo.og_image</code>, <code>author.slug</code> (tác giả chưa có hồ sơ công khai).</li>
+        <li><strong><code>alt</code> của ảnh</strong> (<code>cover</code>, avatar, ảnh trong <code>html</code>): mô tả viết trong bài, nếu trống thì mô tả của ảnh trong thư viện media, nếu không có thì chuỗi rỗng. Không bao giờ là tên file.</li>
       </ul>
       <div class="tabs" data-tabs>
         <div class="tablist" role="tablist" aria-label="Framework">
@@ -517,16 +518,18 @@ export default config;</code></pre></div>
   "site_language": "vi",
   "frontend_url": "https://blog.example.com",
   "posts_per_page": 10,
+  "logo": { "url": "https://cms.example.com/api/v1/media/…/logo.png", "width": 512, "height": 512, "alt": "Logo Blog của An" },
   "seo": {
     "meta_title": "Blog của An",
     "meta_description": "…",
-    "og_image_url": "https://…/og.png",
+    "og_image": { "url": "https://cms.example.com/api/v1/media/…/og.jpg", "width": 1200, "height": 630, "alt": "…" },
     "social_links": { "facebook": "https://facebook.com/…", "github": "https://github.com/an" }
   },
   "homepage": { "shows": "latest_posts", "page_slug": null }
 }</code></pre></div>
       <ul>
         <li><code>site_language</code> dùng cho <code>&lt;html lang&gt;</code> và <code>og:locale</code>.</li>
+        <li><code>logo</code> và <code>seo.og_image</code> là ảnh dạng <code>{url, width, height, alt}</code> như <code>cover</code>, hoặc <code>null</code>. Trường cũ <code>seo.og_image_url</code> đã bỏ: site nào từng lưu URL đó mà chưa chọn ảnh thì nhận <code>seo.og_image = {url, width: null, height: null, alt: ""}</code>.</li>
         <li><code>homepage.shows</code> là <code>latest_posts</code> hoặc <code>page</code>. Khi là <code>page</code>, trang chủ hiển thị trang tĩnh có slug <code>homepage.page_slug</code>.</li>
         <li>Đọc settings trong layout gốc, cache dưới tag <code>settings</code>.</li>
       </ul>
@@ -707,7 +710,7 @@ export default async function sitemap(): Promise&lt;MetadataRoute.Sitemap&gt; {
 }</code></pre></div>
       <ul>
         <li><strong>Title và description</strong>: ưu tiên <code>seo.meta_title</code>/<code>seo.meta_description</code> của bài, rồi tới <code>title</code>/<code>excerpt</code>, cuối cùng là giá trị mặc định trong <code>/settings</code>.</li>
-        <li><strong>Ảnh chia sẻ</strong>: <code>seo.og_image</code> → <code>cover.url</code> → <code>settings.seo.og_image_url</code>.</li>
+        <li><strong>Ảnh chia sẻ</strong>: <code>seo.og_image</code> của bài → <code>cover.url</code> → <code>settings.seo.og_image.url</code>.</li>
         <li><strong>Canonical</strong>: <code>seo.canonical_url</code> nếu có, nếu không thì URL của chính trang.</li>
         <li>Trên 50.000 URL thì chia thành nhiều sitemap kèm sitemap index.</li>
       </ul>
