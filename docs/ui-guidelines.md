@@ -187,7 +187,8 @@ with `sm` buttons. Its `aria-label` names the target ("Delete image cover.jpg").
   primary one labelled and the rest in the row's `⋯` menu, destructive ones last after a
   separator; View, Edit and Delete keep their icon buttons. A form dialog's button names the
   action without the ellipsis (`.submit_label("Schedule")`).
-  Destructive items go last in that menu, after a separator, marked `destructive`.
+- In a custom page's `⋯` menu (`RowActions`), destructive items go last too, after a separator,
+  marked `destructive`.
 - Links that look like buttons use `buttonVariants()`, never a hand-made class.
 
 ## 4. Data: tables, lists, metrics, status
@@ -328,6 +329,7 @@ tokens), do not import from it.
 | `Section` | a card with a header (title, description, actions) and a body |
 | `ScrollTabs` | the kit tabs on one row that scrolls sideways |
 | `TableCard` | a `Section` whose body is a kit `Table`, with a toolbar and an empty state |
+| `TableSkeleton`, `Pager` | a table's loading rows (same columns), and its `1–25 of 132` footer with Previous and Next |
 | `RowActions` | up to two ghost buttons and a `⋯` menu |
 | `IconButton` | a `ghost` 32px icon button with a tooltip and an `aria-label` |
 | `StatusBadge` | a dot and a label from the status vocabulary (§4, `status.ts`) |
@@ -335,9 +337,14 @@ tokens), do not import from it.
 | `Facts` | the label/value grid |
 | `EmptyState` | the empty line, hint and action |
 | `ConfirmDialog` | the confirmation dialog, with an optional typed confirmation |
+| `Field` | a form field: label above, help and errors below, linked by `aria-describedby` |
 | `FilePicker`, `ColorField` | the styled file and color inputs |
 | `icons` | the one icon set (Lucide shapes, 16px, stroke 2, `currentColor`) |
 | `i18n`, `format` | translations, and number, date and size formatting on `Intl` |
+
+Built so far (`ui.tsx`, `icons.tsx`, `status.ts`, `format.ts`, `i18n.ts`): every row above except
+`ScrollTabs`, `Metric`, `FilePicker` and `ColorField`, which no page has needed yet; `format.ts`
+formats dates and relative times only so far.
 
 ## 8. Phone and dark mode
 
