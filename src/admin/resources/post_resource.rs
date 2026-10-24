@@ -64,32 +64,29 @@ impl Resource for PostResource {
         ]
     }
 
+    /// An editor (docs/ui-guidelines.md §5): the whole width, the writing in the main column (the
+    /// slug under the title, SEO folded at the end) and the details in a narrow aside. The
+    /// workflow actions are in the record page's header, not in the aside.
     fn form() -> Form {
-        Form::new().schema(components![Tabs::make().schema(components![
-            Tab::make("Content").schema(components![
-                TextInput::make("title"),
-                TextInput::make("slug").help("Left empty: made from the title"),
-                Textarea::make("excerpt").help("A short summary for lists and search results"),
-                RichEditor::make("body"),
-                FileUpload::make("cover_media_id"),
-                SelectInput::make("category_id"),
-                BelongsToManySelect::make("tags").label("Tags"),
-                Toggle::make("featured").help("Shown first where the public site highlights posts"),
-            ]),
-            Tab::make("SEO").schema(components![
-                TextInput::make("meta_title").help("For search engines. Left empty: the title"),
-                Textarea::make("meta_description").help("For search engines. Left empty: the excerpt"),
-                TextInput::make("canonical_url").url().help("Only when the post first appeared elsewhere"),
-                FileUpload::make("og_media_id").help("Shown when the post is shared. Left empty: the cover"),
-            ]),
-            Tab::make("Publishing").schema(components![
-                SelectInput::make("status")
-                    .options(STATUS_OPTIONS)
-                    .help("Changed with Submit for review, Publish, Schedule and Unpublish"),
-                DateTimePicker::make("published_at").help("Times are in UTC (Vietnam is UTC+7)"),
-                SelectInput::make("author_id"),
-            ]),
-        ])])
+        Form::new().width(FormWidth::Full).schema(components![
+            Split::make()
+                .main(components![
+                    TextInput::make("title"),
+                    TextInput::make("slug").prefix("/posts/").help("Left empty: made from the title"),
+                    RichEditor::make("body"),
+                    Textarea::make("excerpt").help("A short summary for lists and search results"),
+                    content::seo_section(Kind::Post),
+                ])
+                .aside(components![
+                    content::publishing_section(),
+                    content::cover_section(),
+                    Section::make("Organize").compact().schema(components![
+                        SelectInput::make("category_id"),
+                        BelongsToManySelect::make("tags").label("Tags"),
+                        Toggle::make("featured").help("Shown first where the public site highlights posts"),
+                    ]),
+                ])
+        ])
     }
 
     fn table() -> Table {

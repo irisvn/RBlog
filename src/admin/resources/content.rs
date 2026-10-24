@@ -2,6 +2,7 @@
 //! actions. Every write ends in `content_sync::content_changed` (search text, public media,
 //! revision, outbox event); every change of status goes through `services::publishing`.
 
+use rustcms::admin::ui::Layout;
 use rustcms::admin::*;
 use rustcms::{AppResult, ValidationErrors};
 use sea_orm::prelude::DateTimeUtc;
@@ -19,6 +20,43 @@ use crate::services::taxonomy::{self, Taxonomy};
 /// The status words of the workflow (docs/ui-guidelines.md §4), for filters and the form.
 pub const STATUS_OPTIONS: [(&str, &str); 4] =
     [("draft", "Draft"), ("pending", "Pending review"), ("scheduled", "Scheduled"), ("published", "Published")];
+
+/// The editor's SEO section, folded at the end of the main column: what search engines and
+/// shares read. Its help texts name a post or a page.
+pub fn seo_section(kind: Kind) -> Layout {
+    let (first_elsewhere, shared) = match kind {
+        Kind::Post => {
+            ("Only when the post first appeared elsewhere", "Shown when the post is shared. Left empty: the cover")
+        }
+        Kind::Page => {
+            ("Only when the page first appeared elsewhere", "Shown when the page is shared. Left empty: the cover")
+        }
+    };
+    Section::make("SEO").collapsible(true).schema(components![
+        TextInput::make("meta_title").help("For search engines. Left empty: the title"),
+        Textarea::make("meta_description").help("For search engines. Left empty: the excerpt"),
+        TextInput::make("canonical_url").url().help(first_elsewhere),
+        FileUpload::make("og_media_id").help(shared),
+    ])
+}
+
+/// The editor aside's Publishing section: the status and the publish date, read-only (the
+/// workflow actions in the record page's header change them), and the author.
+pub fn publishing_section() -> Layout {
+    Section::make("Publishing").compact().schema(components![
+        SelectInput::make("status")
+            .options(STATUS_OPTIONS)
+            .help("Changed with Submit for review, Publish, Schedule and Unpublish"),
+        DateTimePicker::make("published_at").help("Times are in UTC (Vietnam is UTC+7)"),
+        SelectInput::make("author_id"),
+    ])
+}
+
+/// The editor aside's cover image. Its input is labelled "Image": the section already says
+/// "Cover image".
+pub fn cover_section() -> Layout {
+    Section::make("Cover image").compact().schema(components![FileUpload::make("cover_media_id").label("Image")])
+}
 
 /// The message of a canonical URL that is not a web address (translated here).
 pub const CANONICAL_NOT_WEB: &str = "must be an http or https address";

@@ -253,6 +253,14 @@ badge. The mapping from server states to words lives in one place, `lib/status.t
 - **Native controls**: none raw. File pickers are a `Button` over a hidden input
   (`FilePicker`); colors are a swatch plus a hex input (`ColorField`); checkboxes and switches
   come from the kit.
+- **Editors** (posts and pages, RustCMS 0.10.2): `Form::width(FormWidth::Full)` with one
+  `Split`, so that the text uses the width of the window.
+  - **Main column**: title, then the slug right under it (`TextInput::prefix`: `/posts/` or
+    `/`), body, excerpt, and SEO last in a folded section (`Section::collapsible(true)`).
+  - **Aside**: compact sections (`Section::compact`) for the details: Publishing (status and
+    publish date read-only, author), Cover image, and for posts Organize (category, tags,
+    featured). The workflow actions stay in the page header, never in the aside.
+  - Other forms keep the default width unless a long text field needs more room.
 - **Blog fields**:
   - **Slug**: generated from the title as ASCII without diacritics (`xin-chao-viet-nam`),
     editable, shown in `rblog-mono`. It is unique, and a clash is a field error.
