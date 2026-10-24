@@ -18,6 +18,7 @@ mod post_media;
 mod posts;
 mod publishing;
 mod revisions;
+mod rich_text;
 mod settings;
 mod taxonomy;
 mod webhook;

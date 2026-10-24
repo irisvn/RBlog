@@ -187,7 +187,12 @@ db_test!(published_images_are_public_and_others_are_not, migrate = Migrator, |db
     shown.assert_status(StatusCode::OK);
     let shown = shown.json();
     let inline_url = format!("{APP_URL}/api/v1/media/{}/inline.png", inline.id);
-    assert_eq!(shown["html"], json!(format!("<p>Xin chào</p><img src=\"{inline_url}\" alt=\"hình\">")));
+    assert_eq!(
+        shown["html"],
+        json!(format!(
+            "<p>Xin chào</p><figure><img src=\"{inline_url}\" width=\"1600\" height=\"900\" alt=\"hình\"></figure>"
+        ))
+    );
     let photo_url = format!("{APP_URL}/api/v1/media/{}/nh-b-a.png", photo.id);
     assert_eq!(shown["cover"], json!({"url": photo_url, "width": 1600, "height": 900, "alt": "ảnh bìa.png"}));
     assert_eq!(shown["seo"]["og_image"], json!(null), "a PDF is not an image");
@@ -302,7 +307,13 @@ db_test!(preview_tokens_show_one_subject_and_its_images, migrate = Migrator, |db
     assert_eq!(shown["published_at"], json!(null));
     let media_url = |id: Uuid| format!("{APP_URL}/api/v1/preview/media/{id}?token={token}");
     assert_eq!(shown["cover"]["url"], json!(media_url(cover.id)));
-    assert_eq!(shown["html"], json!(format!("<p>Bản nháp</p><img src=\"{}\" alt=\"hình\">", media_url(inline.id))));
+    assert_eq!(
+        shown["html"],
+        json!(format!(
+            "<p>Bản nháp</p><figure><img src=\"{}\" width=\"1600\" height=\"900\" alt=\"hình\"></figure>",
+            media_url(inline.id)
+        ))
+    );
     assert_eq!(shown["seo"]["og_image"], json!(null));
     assert_eq!(shown["author"], json!({"slug": "an", "name": "An"}));
 

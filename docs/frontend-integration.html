@@ -121,6 +121,7 @@ footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--line)
       <li><a href="#goi-api">Gọi Content API</a></li>
       <li><a href="#endpoint">Danh sách endpoint</a></li>
       <li><a href="#bai-viet">Trang bài viết</a></li>
+      <li><a href="#rich-text">Nội dung rich text</a></li>
       <li><a href="#danh-sach">Danh sách và lọc</a></li>
       <li><a href="#anh">Ảnh</a></li>
       <li><a href="#menu-settings">Menu và cài đặt site</a></li>
@@ -259,8 +260,8 @@ export default defineCachedEventHandler(
       <div class="scroll"><table>
         <thead><tr><th>Đường dẫn</th><th>Trả về</th><th>Tag cache gợi ý</th></tr></thead>
         <tbody>
-          <tr><td class="m"><span class="method">GET</span>/api/v1/content/posts</td><td>Danh sách bài đã đăng, mới nhất trước; lọc và phân trang (mục 06)</td><td class="m">posts</td></tr>
-          <tr><td class="m"><span class="method">GET</span>/api/v1/content/posts/{slug}</td><td>Một bài, có <code>html</code>; slug cũ trả <code>{"redirect"}</code></td><td class="m">post:{id}, posts</td></tr>
+          <tr><td class="m"><span class="method">GET</span>/api/v1/content/posts</td><td>Danh sách bài đã đăng, mới nhất trước; lọc và phân trang (mục 07)</td><td class="m">posts</td></tr>
+          <tr><td class="m"><span class="method">GET</span>/api/v1/content/posts/{slug}</td><td>Một bài, có <code>html</code> và <code>outline</code>; slug cũ trả <code>{"redirect"}</code></td><td class="m">post:{id}, posts</td></tr>
           <tr><td class="m"><span class="method">GET</span>/api/v1/content/pages[/{slug}]</td><td>Trang tĩnh, cùng cấu trúc với bài nhưng không có chuyên mục, thẻ, featured</td><td class="m">page:{id}, pages</td></tr>
           <tr><td class="m"><span class="method">GET</span>/api/v1/content/categories[/{slug}]</td><td><code>{id, slug, name, description, meta_title, meta_description, post_count}</code></td><td class="m">category:{slug}</td></tr>
           <tr><td class="m"><span class="method">GET</span>/api/v1/content/tags[/{slug}]</td><td><code>{id, slug, name, description, post_count}</code></td><td class="m">tag:{slug}</td></tr>
@@ -283,7 +284,8 @@ export default defineCachedEventHandler(
   "slug": "xin-chao-viet-nam",
   "title": "Xin chào Việt Nam",
   "excerpt": "…",
-  "html": "&lt;p&gt;…&lt;/p&gt;",
+  "html": "&lt;h2 id=\"gioi-thieu\"&gt;Giới thiệu&lt;/h2&gt;&lt;p&gt;…&lt;/p&gt;",
+  "outline": [{ "level": 2, "text": "Giới thiệu", "id": "gioi-thieu" }],
   "cover": { "url": "https://cms.example.com/api/v1/media/…/cover.jpg", "width": 1600, "height": 900, "alt": "cover.jpg" },
   "category": { "slug": "du-lich", "name": "Du lịch" },
   "tags": [{ "slug": "ha-noi", "name": "Hà Nội" }],
@@ -295,7 +297,8 @@ export default defineCachedEventHandler(
   "seo": { "meta_title": null, "meta_description": null, "canonical_url": null, "og_image": null }
 }</code></pre></div>
       <ul>
-        <li><strong><code>html</code></strong> đã được RustCMS escape toàn bộ chữ và chỉ chứa thẻ an toàn, nên chèn thẳng được (<code>dangerouslySetInnerHTML</code> hoặc <code>v-html</code>). Muốn tự render bằng component riêng thì gọi thêm <code>?include=document</code> để nhận JSON rich text.</li>
+        <li><strong><code>html</code></strong> đã được RustCMS escape toàn bộ chữ và chỉ chứa thẻ an toàn, nên chèn thẳng được (<code>dangerouslySetInnerHTML</code> hoặc <code>v-html</code>). Muốn tự render bằng component riêng thì gọi thêm <code>?include=document</code> để nhận JSON rich text đúng như đã lưu (phiên bản 1 hoặc 2, xem mục 06).</li>
+        <li><strong><code>outline</code></strong> là danh sách heading của bài theo thứ tự, <code>{level, text, id}</code>, với <code>id</code> trùng <code>id</code> của heading trong <code>html</code>: dùng làm mục lục (mục 06).</li>
         <li><strong>Slug cũ</strong>: API trả 200 <code>{"redirect": "slug-mới"}</code>. Frontend chuyển hướng 301 sang đường dẫn mới để giữ SEO.</li>
         <li><strong>Trường có thể null</strong>: <code>cover</code>, <code>category</code>, <code>seo.og_image</code>, <code>author.slug</code> (tác giả chưa có hồ sơ công khai).</li>
       </ul>
@@ -308,7 +311,8 @@ export default defineCachedEventHandler(
           <div class="code"><div class="bar"><span>app/posts/[slug]/page.tsx</span><button class="copy" type="button">Copy</button></div><pre><code>import { notFound, permanentRedirect } from "next/navigation";
 import { rblog, RBlogError } from "@/lib/rblog";
 
-type Post = { id: string; slug: string; title: string; html: string; /* … */ };
+type Heading = { level: 2 | 3 | 4; text: string; id: string };
+type Post = { id: string; slug: string; title: string; html: string; outline: Heading[]; /* … */ };
 type Answer = Post | { redirect: string };
 
 async function load(slug: string) {
@@ -331,7 +335,7 @@ export default async function PostPage({ params }: { params: Promise&lt;{ slug: 
     &lt;/article&gt;
   );
 }</code></pre></div>
-          <p>Bài được cache dưới tag <code>posts</code>, nên mọi sự kiện có tag <code>posts</code> làm mới nó. Muốn làm mới chính xác từng bài theo <code>post:{id}</code>, lưu thêm một bảng ánh xạ slug → id, hoặc chỉ dùng <code>revalidatePath</code> với <code>paths</code> của webhook (mục 09).</p>
+          <p>Bài được cache dưới tag <code>posts</code>, nên mọi sự kiện có tag <code>posts</code> làm mới nó. Muốn làm mới chính xác từng bài theo <code>post:{id}</code>, lưu thêm một bảng ánh xạ slug → id, hoặc chỉ dùng <code>revalidatePath</code> với <code>paths</code> của webhook (mục 10).</p>
         </div>
         <div class="tabpanel" role="tabpanel" id="p-nuxt-2" aria-labelledby="t-nuxt-2" hidden>
           <div class="code"><div class="bar"><span>pages/posts/[slug].vue</span><button class="copy" type="button">Copy</button></div><pre><code>&lt;script setup lang="ts"&gt;
@@ -358,9 +362,100 @@ useSeoMeta({
       </div>
     </section>
 
+    <section id="rich-text" aria-labelledby="h-rich-text">
+      <h2 id="h-rich-text"><span class="n">06</span>Nội dung rich text</h2>
+      <p>Nội dung bài là document rich text của RustCMS 0.10. Trình soạn thảo ghi phiên bản thấp nhất mà bài cần, nên cả hai phiên bản cùng tồn tại trong dữ liệu và <strong>frontend phải xử lý được cả hai</strong>:</p>
+      <ul>
+        <li><strong>Phiên bản 1</strong>: đoạn văn, heading cấp 2 tới 4, danh sách, trích dẫn, khối code, đường kẻ ngang, ảnh (<code>media</code>, <code>alt</code>).</li>
+        <li><strong>Phiên bản 2</strong> là phiên bản 1 cộng thêm bảng, video nhúng (embed), khung ghi chú (callout), chú thích ảnh (<code>caption</code>) và độ rộng ảnh (<code>width</code>). Không node nào của phiên bản 1 đổi nghĩa.</li>
+      </ul>
+      <div class="scroll"><table>
+        <thead><tr><th>Node</th><th>Trong <code>html</code></th></tr></thead>
+        <tbody>
+          <tr><td>Heading</td><td><code>&lt;h2 id="gioi-thieu"&gt;…&lt;/h2&gt;</code> (<code>h2</code> tới <code>h4</code>)</td></tr>
+          <tr><td>Ảnh</td><td><code>&lt;figure data-width="wide"&gt;&lt;img src="…" width="1600" height="900" alt="…"&gt;&lt;figcaption&gt;…&lt;/figcaption&gt;&lt;/figure&gt;</code></td></tr>
+          <tr><td>Bảng</td><td><code>&lt;table&gt;&lt;thead&gt;…&lt;/thead&gt;&lt;tbody&gt;…&lt;/tbody&gt;&lt;/table&gt;</code>, không gộp ô, không độ rộng cột</td></tr>
+          <tr><td>Embed</td><td><code>&lt;figure data-embed="youtube" data-id="dQw4w9WgXcQ"&gt;&lt;a href="https://www.youtube.com/watch?v=…" rel="noopener noreferrer"&gt;…&lt;/a&gt;&lt;/figure&gt;</code></td></tr>
+          <tr><td>Callout</td><td><code>&lt;aside class="callout" data-tone="info"&gt;…&lt;/aside&gt;</code> (<code>info</code> hoặc <code>warn</code>)</td></tr>
+        </tbody>
+      </table></div>
+      <ul>
+        <li><strong>Ảnh</strong>: <code>width</code>, <code>height</code> là kích thước gốc tính bằng pixel, có khi RBlog biết cả hai. <code>data-width</code> là <code>wide</code> hoặc <code>full</code> khi người viết chọn (không có nghĩa là rộng bình thường). Ảnh chưa công khai bị bỏ khỏi <code>html</code>, kể cả ảnh nằm trong callout.</li>
+        <li><strong>Embed</strong>: chỉ có <code>youtube</code> và <code>vimeo</code>. <code>data-id</code> đã được RustCMS kiểm tra đúng định dạng của từng nhà cung cấp, nên ghép thẳng vào URL player được. Không có JavaScript thì figure là một link bình thường; frontend thay nó bằng iframe và thêm host của player vào <code>frame-src</code> trong CSP của mình. Trang quản trị không bao giờ tải iframe.</li>
+        <li><strong>Heading id</strong> là slug trần của chữ trong heading: bỏ dấu (<code>Đà Nẵng</code> → <code>da-nang</code>), chữ thường, nối bằng <code>-</code>, heading trùng thêm <code>-2</code>, <code>-3</code>. RBlog <strong>không thêm tiền tố</strong>, để <code>html</code> và <code>outline</code> luôn khớp nhau. Id có thể trùng id của layout (<code>main</code>, <code>comments</code>) hoặc bắt đầu bằng số: đặt id riêng của layout có ký tự slug không bao giờ có (<code>site_main</code>, <code>_comments</code>), mỗi trang chỉ render một bài, và chọn phần tử bằng <code>CSS.escape(id)</code>. Muốn anchor có tiền tố (<code>#h-gioi-thieu</code>) thì đổi cùng lúc <code>id</code> của <code>h2</code>–<code>h4</code> trong <code>html</code> và <code>id</code> trong <code>outline</code>.</li>
+        <li>Tìm kiếm (<code>q</code>) và <code>reading_minutes</code> tính cả chữ trong bảng, callout và chú thích ảnh.</li>
+      </ul>
+      <h3>Video, mục lục và ảnh có kích thước</h3>
+      <p>Ví dụ dưới đây đổi figure embed thành iframe, dựng mục lục từ <code>outline</code>, và đặt <code>id</code> của layout theo cách không trùng slug. <code>html</code> đã được escape nên chỉ cần thay chuỗi; không dùng thư viện parse HTML nào phía client.</p>
+      <div class="tabs" data-tabs>
+        <div class="tablist" role="tablist" aria-label="Framework">
+          <button role="tab" id="t-next-rt" aria-controls="p-next-rt" aria-selected="true">Next.js</button>
+          <button role="tab" id="t-nuxt-rt" aria-controls="p-nuxt-rt" aria-selected="false" tabindex="-1">Nuxt 3</button>
+        </div>
+        <div class="tabpanel" role="tabpanel" id="p-next-rt" aria-labelledby="t-next-rt">
+          <div class="code"><div class="bar"><span>lib/rich-text.ts</span><button class="copy" type="button">Copy</button></div><pre><code>// Embed figures become players. data-embed and data-id are checked by RustCMS
+// (youtube: [A-Za-z0-9_-]{11}, vimeo: digits); match them strictly all the same.
+const EMBED = /&lt;figure data-embed="(youtube|vimeo)" data-id="([A-Za-z0-9_-]{1,15})"&gt;.*?&lt;\/figure&gt;/g;
+
+export function withPlayers(html: string): string {
+  return html.replace(EMBED, (_, provider: string, id: string) =&gt; {
+    const src = provider === "youtube"
+      ? `https://www.youtube-nocookie.com/embed/${id}`
+      : `https://player.vimeo.com/video/${id}`;
+    return `&lt;figure class="embed"&gt;&lt;iframe src="${src}" title="${provider} video" loading="lazy"
+      allow="encrypted-media; picture-in-picture; fullscreen" allowfullscreen&gt;&lt;/iframe&gt;&lt;/figure&gt;`;
+  });
+}
+
+export type Heading = { level: 2 | 3 | 4; text: string; id: string };</code></pre></div>
+          <div class="code"><div class="bar"><span>app/posts/[slug]/page.tsx (phần thân)</span><button class="copy" type="button">Copy</button></div><pre><code>&lt;article&gt;
+  &lt;h1&gt;{post.title}&lt;/h1&gt;
+  {post.outline.length &gt; 1 &amp;&amp; (
+    &lt;nav aria-label="Mục lục" id="site_toc"&gt;
+      &lt;ol&gt;
+        {post.outline.map((h) =&gt; (
+          &lt;li key={h.id} data-level={h.level}&gt;&lt;a href={`#${h.id}`}&gt;{h.text}&lt;/a&gt;&lt;/li&gt;
+        ))}
+      &lt;/ol&gt;
+    &lt;/nav&gt;
+  )}
+  &lt;div className="prose" dangerouslySetInnerHTML={{ __html: withPlayers(post.html) }} /&gt;
+&lt;/article&gt;</code></pre></div>
+          <p>Ảnh trong <code>html</code> đã có <code>width</code>/<code>height</code>, nên CSS <code>.prose img { max-width: 100%; height: auto; }</code> là đủ để trình duyệt giữ chỗ. Muốn đi qua <code>next/image</code> thì render <code>?include=document</code> bằng component riêng, lấy URL và kích thước của từng ảnh từ <code>html</code> (ảnh không có trong <code>html</code> là ảnh chưa công khai: bỏ qua).</p>
+          <div class="code"><div class="bar"><span>next.config.ts (CSP cho player)</span><button class="copy" type="button">Copy</button></div><pre><code>headers: async () =&gt; [{
+  source: "/posts/:slug*",
+  headers: [{ key: "Content-Security-Policy",
+    value: "frame-src https://www.youtube-nocookie.com https://player.vimeo.com" }],
+}],</code></pre></div>
+        </div>
+        <div class="tabpanel" role="tabpanel" id="p-nuxt-rt" aria-labelledby="t-nuxt-rt" hidden>
+          <div class="code"><div class="bar"><span>pages/posts/[slug].vue (phần template)</span><button class="copy" type="button">Copy</button></div><pre><code>&lt;script setup lang="ts"&gt;
+import { withPlayers } from "~/utils/rich-text"; // the same function as the Next.js tab
+// …load data as in section 05
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;article v-if="data &amp;&amp; !('redirect' in data)"&gt;
+    &lt;h1&gt;{{ data.title }}&lt;/h1&gt;
+    &lt;nav v-if="data.outline.length &gt; 1" id="site_toc" aria-label="Mục lục"&gt;
+      &lt;ol&gt;
+        &lt;li v-for="h in data.outline" :key="h.id" :data-level="h.level"&gt;
+          &lt;a :href="`#${h.id}`"&gt;{{ h.text }}&lt;/a&gt;
+        &lt;/li&gt;
+      &lt;/ol&gt;
+    &lt;/nav&gt;
+    &lt;div class="prose" v-html="withPlayers(data.html)" /&gt;
+  &lt;/article&gt;
+&lt;/template&gt;</code></pre></div>
+          <p>Với <code>&lt;NuxtImg&gt;</code>, render <code>?include=document</code> bằng component riêng và truyền <code>width</code>, <code>height</code> lấy từ thẻ <code>&lt;img&gt;</code> tương ứng trong <code>html</code>. CSP cho player đặt bằng <code>routeRules</code> hoặc module <code>nuxt-security</code>, với <code>frame-src https://www.youtube-nocookie.com https://player.vimeo.com</code>.</p>
+        </div>
+      </div>
+      <div class="note warn"><b>Tự render từ <code>document</code></b>Chấp nhận cả <code>"version": 1</code> và <code>"version": 2</code>, bỏ qua loại node chưa biết (RustCMS có thể thêm node ở phiên bản sau), và chỉ hiện ảnh có URL trong <code>html</code> hoặc <code>cover</code>.</div>
+    </section>
+
     <section id="danh-sach" aria-labelledby="h-danh-sach">
-      <h2 id="h-danh-sach"><span class="n">06</span>Danh sách và lọc</h2>
-      <p>Danh sách trả dạng <code>{ "data": [...], "meta": { "page", "perPage", "total", "lastPage" } }</code>. Bài và trang xếp theo thời điểm đăng rồi tới id, đều giảm dần, nên các trang không trùng hay sót bài. Mỗi mục trong danh sách có đủ trường như bài đơn lẻ, trừ <code>html</code> và <code>document</code>.</p>
+      <h2 id="h-danh-sach"><span class="n">07</span>Danh sách và lọc</h2>
+      <p>Danh sách trả dạng <code>{ "data": [...], "meta": { "page", "perPage", "total", "lastPage" } }</code>. Bài và trang xếp theo thời điểm đăng rồi tới id, đều giảm dần, nên các trang không trùng hay sót bài. Mỗi mục trong danh sách có đủ trường như bài đơn lẻ, trừ <code>html</code>, <code>outline</code> và <code>document</code>.</p>
       <div class="scroll"><table>
         <thead><tr><th>Tham số</th><th>Ý nghĩa</th></tr></thead>
         <tbody>
@@ -376,12 +471,12 @@ useSeoMeta({
     </section>
 
     <section id="anh" aria-labelledby="h-anh">
-      <h2 id="h-anh"><span class="n">07</span>Ảnh</h2>
+      <h2 id="h-anh"><span class="n">08</span>Ảnh</h2>
       <ul>
         <li>URL ảnh trong <code>html</code>, <code>cover</code>, <code>avatar</code> là URL tuyệt đối trên domain của RBlog: <code>/api/v1/media/{id}/{tên-file}</code>. Không cần key.</li>
         <li>Chỉ ảnh thuộc nội dung đang công khai mới tải được. Ảnh của bản nháp hay ảnh đã xoá trả 404, nên khi gỡ đăng một bài, ảnh của nó cũng ngừng hiển thị (tối đa 1 giờ do cache).</li>
         <li>Header <code>Cache-Control: public, max-age=3600</code>. Giới hạn 600 request mỗi phút cho mỗi IP: khi chạy thật, đặt CDN trước RBlog hoặc dùng bộ tối ưu ảnh của framework.</li>
-        <li>RBlog không resize ảnh. Dùng <code>next/image</code> hoặc <code>@nuxt/image</code>; <code>cover.width</code> và <code>cover.height</code> có sẵn để tránh giật layout.</li>
+        <li>RBlog không resize ảnh. Dùng <code>next/image</code> hoặc <code>@nuxt/image</code>; <code>cover.width</code> và <code>cover.height</code> có sẵn để tránh giật layout. Ảnh trong <code>html</code> cũng có <code>width</code> và <code>height</code> trên thẻ <code>&lt;img&gt;</code> (mục 06).</li>
       </ul>
       <div class="tabs" data-tabs>
         <div class="tablist" role="tablist" aria-label="Framework">
@@ -408,7 +503,7 @@ export default config;</code></pre></div>
     </section>
 
     <section id="menu-settings" aria-labelledby="h-menu-settings">
-      <h2 id="h-menu-settings"><span class="n">08</span>Menu và cài đặt site</h2>
+      <h2 id="h-menu-settings"><span class="n">09</span>Menu và cài đặt site</h2>
       <div class="code"><div class="bar"><span>GET /api/v1/content/menus/primary</span><button class="copy" type="button">Copy</button></div><pre><code>{ "key": "primary", "name": "Primary", "items": [
   { "id": "1", "label": "Trang chủ", "href": "/", "new_tab": false, "children": [
     { "id": "2", "label": "Xin chào", "href": "/posts/xin-chao-viet-nam", "new_tab": false }
@@ -438,7 +533,7 @@ export default config;</code></pre></div>
     </section>
 
     <section id="webhook" aria-labelledby="h-webhook">
-      <h2 id="h-webhook"><span class="n">09</span>Webhook làm mới cache</h2>
+      <h2 id="h-webhook"><span class="n">10</span>Webhook làm mới cache</h2>
       <p>Mỗi thay đổi ảnh hưởng tới trang công khai (lưu, đăng, gỡ đăng, xoá bài; sửa chuyên mục, thẻ, tác giả, menu, cài đặt), RBlog gửi một POST tới URL webhook. Một sự kiện được gửi <strong>ít nhất một lần</strong>, có thể tới trễ hoặc lệch thứ tự.</p>
       <div class="code"><div class="bar"><span>Body webhook</span><button class="copy" type="button">Copy</button></div><pre><code>{
   "id": "0192b0a4-7c1e-7000-8000-000000000001",
@@ -526,7 +621,7 @@ export default defineEventHandler(async (event) =&gt; {
     </section>
 
     <section id="preview" aria-labelledby="h-preview">
-      <h2 id="h-preview"><span class="n">10</span>Xem trước bản nháp</h2>
+      <h2 id="h-preview"><span class="n">11</span>Xem trước bản nháp</h2>
       <p>Người viết bấm <em>Xem trước</em> trong admin; RBlog tạo link <code>{frontend_url}{preview_path}?token=…</code> (ví dụ <code>https://blog.example.com/preview?token=…</code>). Token sống 1 giờ, thu hồi được, và chỉ mở đúng một bài.</p>
       <ul>
         <li>Route preview của frontend gọi <code>GET {RBLOG_URL}/api/v1/preview?token=…</code> <strong>từ server, không gửi key</strong>.</li>
@@ -589,7 +684,7 @@ const { data, error } = await useFetch("/api/preview", { query: { token: route.q
     </section>
 
     <section id="sitemap" aria-labelledby="h-sitemap">
-      <h2 id="h-sitemap"><span class="n">11</span>Sitemap và SEO</h2>
+      <h2 id="h-sitemap"><span class="n">12</span>Sitemap và SEO</h2>
       <p><code>GET /sitemap?type=post|page|category|tag&amp;after=&lt;cursor&gt;</code> trả <code>{ "data": [{ "type", "path", "lastmod" }], "next": "&lt;cursor&gt;" | null }</code>, tối đa 1000 dòng mỗi lần. Gọi lặp với <code>after = next</code> tới khi <code>next</code> là <code>null</code>. Chuyên mục và thẻ chỉ có mặt khi có ít nhất một bài đã đăng.</p>
       <div class="code"><div class="bar"><span>app/sitemap.ts (Next.js)</span><button class="copy" type="button">Copy</button></div><pre><code>import type { MetadataRoute } from "next";
 import { rblog } from "@/lib/rblog";
@@ -619,7 +714,7 @@ export default async function sitemap(): Promise&lt;MetadataRoute.Sitemap&gt; {
     </section>
 
     <section id="loi" aria-labelledby="h-loi">
-      <h2 id="h-loi"><span class="n">12</span>Xử lý lỗi</h2>
+      <h2 id="h-loi"><span class="n">13</span>Xử lý lỗi</h2>
       <p>Lỗi trả dạng <code>{ "message", "code", "errors" }</code>.</p>
       <div class="scroll"><table>
         <thead><tr><th>Mã</th><th>Khi nào</th><th>Frontend nên làm</th></tr></thead>
@@ -635,7 +730,7 @@ export default async function sitemap(): Promise&lt;MetadataRoute.Sitemap&gt; {
     </section>
 
     <section id="checklist" aria-labelledby="h-checklist">
-      <h2 id="h-checklist"><span class="n">13</span>Checklist trước khi chạy thật</h2>
+      <h2 id="h-checklist"><span class="n">14</span>Checklist trước khi chạy thật</h2>
       <ul class="check">
         <li>Key chỉ nằm trong biến môi trường phía server, không có trong bundle trình duyệt.</li>
         <li>Mỗi môi trường (staging, production) dùng một key riêng, có thời hạn; thu hồi key cũ khi đổi.</li>

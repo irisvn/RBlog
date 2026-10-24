@@ -3,7 +3,7 @@
 use std::collections::{BTreeSet, HashMap};
 
 use rustcms::admin::media::entity as media;
-use rustcms::admin::rich_text;
+use rustcms::admin::rich_text::{self, ImageInfo};
 use rustcms::models::user;
 use sea_orm::prelude::{DateTimeUtc, Uuid};
 use sea_orm::{ColumnTrait, ConnectionTrait, DbErr, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
@@ -17,7 +17,7 @@ use crate::services::public_media::body_media_ids;
 /// What a single record adds to the list fields.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Detail {
-    /// `html`, the body rendered (single records).
+    /// `html` and `outline`: the body rendered, and its headings (single records).
     pub html: bool,
     /// `document`, the body as stored (`?include=document`).
     pub document: bool,
@@ -48,6 +48,9 @@ pub struct EntryJson {
     pub excerpt: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub html: Option<String>,
+    /// The body's headings, in order, with the ids `html` gives them (single records).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub outline: Option<Vec<HeadingJson>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub document: Option<Value>,
     pub cover: Option<ImageJson>,
@@ -56,6 +59,14 @@ pub struct EntryJson {
     pub updated_at: String,
     pub reading_minutes: i32,
     pub seo: SeoJson,
+}
+
+/// A heading of the body: `{level, text, id}` (`id` is the bare slug `html` gives it).
+#[derive(Debug, Clone, Serialize)]
+pub struct HeadingJson {
+    pub level: u8,
+    pub text: String,
+    pub id: String,
 }
 
 /// A post.
@@ -158,10 +169,17 @@ impl Shared {
 
     fn entry(&self, links: &Links<'_>, s: &Source<'_>, detail: Detail) -> EntryJson {
         let image = |id: Option<Uuid>| id.and_then(|id| self.images.get(&id));
-        let html = detail.html.then(|| {
-            s.body
-                .and_then(|body| rich_text::parse(body).ok())
-                .map(|doc| rich_text::to_html(&doc, &|id| self.images.get(&id).map(|m| links.url(m))))
+        let document = detail.html.then(|| s.body.and_then(|body| rich_text::parse(body).ok())).flatten();
+        let html = detail.html.then(|| document.as_ref().map(|doc| self.html(links, doc)).unwrap_or_default());
+        let outline = detail.html.then(|| {
+            document
+                .as_ref()
+                .map(|doc| {
+                    rich_text::outline(doc)
+                        .into_iter()
+                        .map(|h| HeadingJson { level: h.level, text: h.text, id: h.id })
+                        .collect()
+                })
                 .unwrap_or_default()
         });
         EntryJson {
@@ -170,6 +188,7 @@ impl Shared {
             title: s.title.to_owned(),
             excerpt: s.excerpt.clone(),
             html,
+            outline,
             document: if detail.document { Some(s.body.cloned().unwrap_or(Value::Null)) } else { None },
             cover: image(s.cover).map(|m| ImageJson::new(links, m)),
             author: self
@@ -187,6 +206,30 @@ impl Shared {
                 og_image: image(s.og).map(|m| links.url(m)),
             },
         }
+    }
+}
+
+impl Shared {
+    /// `doc` as HTML: images these links may show as figures with their URL and size (so
+    /// browsers reserve the space), the others left out.
+    fn html(&self, links: &Links<'_>, doc: &rich_text::Document) -> String {
+        let images: HashMap<Uuid, ImageInfo> = rich_text::media_ids(doc)
+            .into_iter()
+            .filter_map(|id| self.images.get(&id))
+            .map(|m| {
+                let info = ImageInfo::new(links.url(m));
+                let size =
+                    m.width.zip(m.height).and_then(|(w, h)| Some((u32::try_from(w).ok()?, u32::try_from(h).ok()?)));
+                (
+                    m.id,
+                    match size {
+                        Some((w, h)) if w > 0 && h > 0 => info.size(w, h),
+                        _ => info,
+                    },
+                )
+            })
+            .collect();
+        rich_text::to_html_with(doc, &images)
     }
 }
 
