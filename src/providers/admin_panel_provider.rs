@@ -30,6 +30,11 @@ pub fn provider() -> AdminProvider {
         .settings::<ReadingSettings>()
         .settings::<SeoSettings>()
         .settings::<IntegrationSettings>()
+        // Posts and pages come first: in the navigation (`sort`) and, since RustCMS 0.10.1, on the
+        // dashboard's resource cards, which follow the order of registration. Revisions are
+        // shown on their pages.
+        .resource::<crate::admin::resources::post_resource::PostResource>()
+        .resource::<crate::admin::resources::page_resource::PageResource>()
         .resource::<crate::admin::resources::category_resource::CategoryResource>()
         .resource::<crate::admin::resources::tag_resource::TagResource>()
         .resource::<crate::admin::resources::menu_resource::MenuResource>()
@@ -39,9 +44,6 @@ pub fn provider() -> AdminProvider {
         .resource::<crate::admin::resources::user_resource::UserResource>()
         // The target of posts' and pages' `author_id`: names only (read only, no navigation entry).
         .resource::<crate::admin::resources::post_author_resource::PostAuthorResource>()
-        // Posts and pages come first in the navigation (`sort`); revisions are shown on their pages.
-        .resource::<crate::admin::resources::post_resource::PostResource>()
-        .resource::<crate::admin::resources::page_resource::PageResource>()
         .resource::<crate::admin::resources::post_revision_resource::PostRevisionResource>()
         .resource::<crate::admin::resources::page_revision_resource::PageRevisionResource>()
         // rustcms:resources
