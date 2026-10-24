@@ -126,6 +126,9 @@ db_test!(the_demo_content_covers_every_status, migrate = Migrator, |db: TestDb| 
         assert_eq!(image.alt.as_deref(), Some(alt), "{name}");
         assert_eq!((image.mime.as_str(), image.width, image.height), ("image/png", Some(320), Some(180)), "{name}");
     }
+    let audited = audit_log::Entity::find().all(db).await.unwrap();
+    let media_created = audited.iter().filter(|e| e.event == "created" && e.subject_type == "media").count();
+    assert_eq!(media_created, IMAGES.len(), "each demo image is audited");
     let covered = post::Entity::find().filter(post::Column::CoverMediaId.is_not_null()).all(db).await.unwrap();
     assert_eq!(covered.len(), IMAGES.len());
     let reader = support::content::reader(&app).await;

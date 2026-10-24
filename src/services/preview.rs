@@ -15,6 +15,8 @@ use crate::models::{page, post, preview_token};
 pub const LIFETIME: Duration = Duration::from_secs(3600);
 /// Length of a token: 43 alphanumeric characters, about 256 bits.
 pub const TOKEN_LEN: usize = 43;
+/// The longest page an action may open (RustCMS `ActionOutcome::open`: 2,048 bytes).
+pub const MAX_OPEN_URL: usize = 2048;
 
 /// What a preview token shows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -102,16 +104,50 @@ impl Target {
     /// Whether the panel may open links of this target in a new tab (an action's `open`): an
     /// `https://` site whose host is an ASCII name, an IPv4 or a bracketed IPv6 address. The
     /// public site URL may also be `http://localhost` (development), which the panel never
-    /// opens.
+    /// opens. Its links must also fit the panel's limit on a page to open
+    /// ([`MAX_OPEN_URL`]).
     pub fn opens_in_panel(&self) -> bool {
+        if preview_url(&self.frontend, &self.path, &"x".repeat(TOKEN_LEN)).len() > MAX_OPEN_URL {
+            return false;
+        }
         let Some(scheme) = self.frontend.get(..8) else { return false };
         if !scheme.eq_ignore_ascii_case("https://") {
             return false;
         }
         let authority = self.frontend[8..].split(['/', '?', '#']).next().unwrap_or_default();
-        !authority.is_empty()
-            && !authority.starts_with([':', '.', '-'])
-            && authority.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b':' | b'[' | b']'))
+        // As RustCMS checks it: `[ipv6]` or a name of labels (1–63 letters, digits and inner
+        // `-`, 253 at most), then an optional port 1–65535.
+        let (host, port) = match authority.strip_prefix('[') {
+            Some(rest) => match rest.split_once(']') {
+                Some((ip, after)) if ip.parse::<std::net::Ipv6Addr>().is_ok() => match after {
+                    "" => (None, None),
+                    _ => match after.strip_prefix(':') {
+                        Some(port) => (None, Some(port)),
+                        None => return false,
+                    },
+                },
+                _ => return false,
+            },
+            None => match authority.split_once(':') {
+                Some((host, port)) => (Some(host), Some(port)),
+                None => (Some(authority), None),
+            },
+        };
+        let port_ok = port.is_none_or(|p| {
+            !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit()) && p.parse::<u16>().is_ok_and(|n| n > 0)
+        });
+        let host_ok = host.is_none_or(|host| {
+            !host.is_empty()
+                && host.len() <= 253
+                && host.split('.').all(|label| {
+                    !label.is_empty()
+                        && label.len() <= 63
+                        && !label.starts_with('-')
+                        && !label.ends_with('-')
+                        && label.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
+                })
+        });
+        port_ok && host_ok
     }
 }
 
@@ -240,7 +276,22 @@ pub async fn page<C: ConnectionTrait>(db: &C, id: i64) -> Result<Option<page::Mo
 
 #[cfg(test)]
 mod tests {
-    use super::preview_url;
+    use super::{Target, preview_url};
+
+    #[test]
+    fn the_panel_opens_https_sites_whose_links_fit() {
+        let target = |frontend: String| Target { frontend, path: "/preview".into() };
+        assert!(target("https://blog.example.com".into()).opens_in_panel());
+        assert!(target("HTTPS://blog.example.com:8443".into()).opens_in_panel());
+        assert!(!target("http://localhost:3000".into()).opens_in_panel());
+        assert!(!target("https://đà-nẵng.vn".into()).opens_in_panel());
+        assert!(target("https://[::1]:8443".into()).opens_in_panel());
+        assert!(!target(format!("https://{}.vn", "a".repeat(64))).opens_in_panel());
+        assert!(!target("https://blog.example.com:0".into()).opens_in_panel());
+        // Settings accept 2,000 characters: with the route and a token, too long to open.
+        let long = format!("https://blog.example.com/{}", "a".repeat(1_975));
+        assert!(!target(long).opens_in_panel());
+    }
 
     #[test]
     fn the_token_joins_the_query_before_the_fragment() {

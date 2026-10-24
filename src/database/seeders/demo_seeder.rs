@@ -507,7 +507,9 @@ async fn seed_posts(
         };
         // A cover for the first posts, uploaded by their author (without a media library: none).
         let cover = match (storage, demo_images::IMAGES.get(n as usize)) {
-            (Some(storage), Some(image)) => Some(demo_images::ensure(txn, storage, users[author].id, *image).await?.id),
+            (Some(storage), Some(image)) => {
+                Some(demo_images::ensure(txn, storage, users[author].id, *image, audit).await?.id)
+            }
             _ => None,
         };
         let made = post::ActiveModel {

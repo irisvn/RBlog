@@ -1,11 +1,14 @@
 //! The demo seeder's images: small landscapes drawn here (two-colour sky, sea or field, a sun),
 //! stored as PNG files in the media library with their Vietnamese alternative text, so that
 //! covers, the Media page and the Content API's `alt` have something to show. No image files are
-//! committed and nothing is downloaded.
+//! committed and nothing is downloaded. Rows and their audit entries commit with the seeder's
+//! transaction; the files are stored before it, so a failed seed leaves them behind on the disk
+//! (demo data only: a second run stores new ones).
 
 use std::path::PathBuf;
 
 use rustcms::admin::media::entity as media;
+use rustcms::audit::AuditEntry;
 use rustcms::storage::{Storage, StorageKey};
 use sea_orm::prelude::{DateTimeUtc, Uuid};
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseTransaction, EntityTrait, QueryFilter, Set};
@@ -34,6 +37,7 @@ pub async fn ensure(
     storage: &dyn Storage,
     owner: i64,
     (name, alt, sky, ground): DemoImage,
+    audit: &mut Vec<AuditEntry>,
 ) -> anyhow::Result<media::Model> {
     let found = media::Entity::find()
         .filter(media::Column::OwnerId.eq(owner))
@@ -47,7 +51,9 @@ pub async fn ensure(
         }
         let mut described: media::ActiveModel = found.into();
         described.alt = Set(Some(alt.into()));
-        return Ok(described.update(txn).await?);
+        let described = described.update(txn).await?;
+        audit.push(AuditEntry::new("updated", "media").key(described.id));
+        return Ok(described);
     }
     let bytes = png(&landscape(sky, ground));
     let key = StorageKey::generate("png")?;
@@ -77,6 +83,7 @@ pub async fn ensure(
     }
     .insert(txn)
     .await?;
+    audit.push(AuditEntry::new("created", "media").key(made.id));
     Ok(made)
 }
 
