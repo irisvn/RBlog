@@ -32,6 +32,7 @@ async fn counts(db: &DatabaseConnection) -> Vec<(&'static str, u64)> {
         ("slug_history", slug_history::Entity::find().count(db).await.unwrap()),
         ("content_events", content_event::Entity::find().count(db).await.unwrap()),
         ("public_media", public_media::Entity::find().count(db).await.unwrap()),
+        ("media", rustcms::admin::media::entity::Entity::find().count(db).await.unwrap()),
         ("audit_logs", audit_log::Entity::find().count(db).await.unwrap()),
     ]
 }
@@ -48,7 +49,7 @@ async fn posts(db: &DatabaseConnection, status: &str, trashed: bool) -> Vec<post
 }
 
 db_test!(the_demo_content_covers_every_status, migrate = Migrator, |db: TestDb| async move {
-    let app = support::app(db).await;
+    let app = support::content::app(db).await;
     DemoSeeder.run(app.state()).await.unwrap();
     let db = app.state().db();
     let now = content_sync::now();
@@ -114,6 +115,30 @@ db_test!(the_demo_content_covers_every_status, migrate = Migrator, |db: TestDb| 
         }
     }
 
+    // The first posts have covers: images of the library, with their alternative text, public
+    // while their post is (the Content API's `cover.alt`).
+    use rblog::database::seeders::demo_images::IMAGES;
+    use rustcms::admin::media::entity as media;
+    let library = media::Entity::find().all(db).await.unwrap();
+    assert_eq!(library.len(), IMAGES.len());
+    for (name, alt, ..) in IMAGES {
+        let image = library.iter().find(|m| m.name == name).expect(name);
+        assert_eq!(image.alt.as_deref(), Some(alt), "{name}");
+        assert_eq!((image.mime.as_str(), image.width, image.height), ("image/png", Some(320), Some(180)), "{name}");
+    }
+    let covered = post::Entity::find().filter(post::Column::CoverMediaId.is_not_null()).all(db).await.unwrap();
+    assert_eq!(covered.len(), IMAGES.len());
+    let reader = support::content::reader(&app).await;
+    let first = reader.get("/api/v1/content/posts/mot-ngay-lang-thang-pho-co-ha-noi").await;
+    first.assert_status(rustcms::axum::http::StatusCode::OK);
+    assert_eq!(first.json()["cover"]["alt"], serde_json::json!(IMAGES[0].1));
+    let file = app
+        .client()
+        .get(first.json()["cover"]["url"].as_str().unwrap().trim_start_matches(support::content::APP_URL))
+        .await;
+    file.assert_status(rustcms::axum::http::StatusCode::OK);
+    assert_eq!(&file.body[..8], b"\x89PNG\r\n\x1a\n");
+
     // The outbox heard about what it covers on main: authors, categories, tags, menus.
     let kinds: Vec<String> = content_event::Entity::find().all(db).await.unwrap().into_iter().map(|e| e.kind).collect();
     for (kind, expected) in
@@ -124,7 +149,7 @@ db_test!(the_demo_content_covers_every_status, migrate = Migrator, |db: TestDb| 
 });
 
 db_test!(seeding_twice_adds_nothing, migrate = Migrator, |db: TestDb| async move {
-    let app = support::app(db).await;
+    let app = support::content::app(db).await;
     let db = app.state().db();
     // Not part of `db:seed`.
     DatabaseSeeder.run(app.state()).await.unwrap();

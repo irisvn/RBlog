@@ -6,6 +6,7 @@ use rustcms::database::Seeder;
 use rustcms::{AppState, async_trait};
 
 pub mod content_api_seeder;
+pub mod demo_images;
 pub mod demo_seeder;
 pub mod role_seeder;
 // rustcms:seeder-mods

@@ -5,6 +5,10 @@
 //! whether it is public calls it in its own transaction. [`backfill`] rebuilds every row
 //! (`rblog content:sync-public-media`).
 //!
+//! The images of the public settings (the logo, the default share image) are public too: rows of
+//! subject `settings`, one subject per settings group ([`SettingsImages`]), written by the
+//! settings pages' `after_save` ([`sync_settings`]).
+//!
 //! A public post's rows also name its author's avatar: the avatar is public while one of their
 //! posts is (`GET /api/v1/content/authors/{slug}` shows it then), and changing a post's author
 //! moves it with the post.
@@ -25,7 +29,11 @@ use sea_orm::{
 };
 use serde_json::Value;
 
+use rustcms::crypto::Keyring;
+
 use crate::models::{author_profile, page, post, public_media};
+use crate::settings::general_settings::GeneralSettings;
+use crate::settings::seo_settings::SeoSettings;
 
 /// The media types served publicly (and in previews): images only.
 pub const IMAGE_MIMES: [&str; 4] = ["image/png", "image/jpeg", "image/gif", "image/webp"];
@@ -49,6 +57,38 @@ impl Subject {
             Self::Page => "page",
         }
     }
+}
+
+/// The `public_media.subject_type` of the image settings' rows ([`sync_settings`]).
+pub const SETTINGS: &str = "settings";
+
+/// The settings groups that show images publicly: the `subject_id` of their `public_media` rows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(i64)]
+pub enum SettingsImages {
+    /// Settings → General: the logo.
+    General = 1,
+    /// Settings → SEO and social: the default share image.
+    Seo = 2,
+}
+
+impl SettingsImages {
+    pub const ALL: [Self; 2] = [Self::General, Self::Seo];
+
+    pub fn id(self) -> i64 {
+        self as i64
+    }
+}
+
+/// Makes the `public_media` rows of settings group `group` exactly `media` (its image settings
+/// as saved). Call it in the save's transaction (`SettingsPage::after_save`): the settings row is
+/// locked by the save, so two saves of one group never interleave.
+pub async fn sync_settings<C: ConnectionTrait>(
+    txn: &C,
+    group: SettingsImages,
+    media: impl IntoIterator<Item = Uuid>,
+) -> Result<(), DbErr> {
+    replace(txn, SETTINGS, group.id(), media.into_iter().collect()).await
 }
 
 /// The media ids a rich-text body shows (none when it is empty or not a valid document).
@@ -92,7 +132,7 @@ async fn sync_post<C: ConnectionTrait>(txn: &C, id: i64) -> Result<(), DbErr> {
         let profile = author_profile::Entity::find_by_id(p.author_id).one(txn).await?;
         media.extend(profile.and_then(|a| a.avatar_media_id));
     }
-    replace(txn, Subject::Post, id, media).await
+    replace(txn, Subject::Post.as_str(), id, media).await
 }
 
 async fn sync_page<C: ConnectionTrait>(txn: &C, id: i64) -> Result<(), DbErr> {
@@ -101,7 +141,7 @@ async fn sync_page<C: ConnectionTrait>(txn: &C, id: i64) -> Result<(), DbErr> {
     let now = super::content_sync::now();
     let found = found.filter(|p| p.is_public_at(now));
     let media = found.map(|p| content_media(p.cover_media_id, p.og_media_id, p.body.as_ref())).unwrap_or_default();
-    replace(txn, Subject::Page, id, media).await
+    replace(txn, Subject::Page.as_str(), id, media).await
 }
 
 /// Cover, OG image and body images.
@@ -109,15 +149,15 @@ fn content_media(cover: Option<Uuid>, og: Option<Uuid>, body: Option<&Value>) ->
     cover.into_iter().chain(og).chain(body_media_ids(body)).collect()
 }
 
-/// Makes the rows of `subject` exactly `media`.
+/// Makes the rows of `subject` (a `subject_type`) exactly `media`.
 async fn replace<C: ConnectionTrait>(
     txn: &C,
-    subject: Subject,
+    subject: &str,
     subject_id: i64,
     media: BTreeSet<Uuid>,
 ) -> Result<(), DbErr> {
     let of_subject = Condition::all()
-        .add(public_media::Column::SubjectType.eq(subject.as_str()))
+        .add(public_media::Column::SubjectType.eq(subject))
         .add(public_media::Column::SubjectId.eq(subject_id));
     let mut stale = public_media::Entity::delete_many().filter(of_subject);
     if !media.is_empty() {
@@ -129,7 +169,7 @@ async fn replace<C: ConnectionTrait>(
     }
     let rows = media.into_iter().map(|media_id| public_media::ActiveModel {
         media_id: Set(media_id),
-        subject_type: Set(subject.as_str().to_owned()),
+        subject_type: Set(subject.to_owned()),
         subject_id: Set(subject_id),
     });
     // Rows already there stay.
@@ -140,19 +180,30 @@ async fn replace<C: ConnectionTrait>(
 /// What [`backfill`] did.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct BackfillReport {
-    /// Posts and pages synced.
+    /// Posts, pages and settings groups synced.
     pub subjects: u64,
-    /// Rows of posts and pages that no longer exist (or of unknown subject types), removed.
+    /// Rows of posts, pages and settings groups that no longer exist (or of unknown subject
+    /// types), removed.
     pub orphans: u64,
 }
 
 /// Subjects synced per transaction.
 const BATCH: u64 = 200;
 
-/// Rebuilds `public_media` for every post and page (by batches, each in its own transaction),
-/// then removes the rows of subjects that no longer exist. Safe while the site runs.
-pub async fn backfill(db: &DatabaseConnection) -> Result<BackfillReport, DbErr> {
+/// Rebuilds `public_media` for every post and page (by batches, each in its own transaction) and
+/// for the image settings, then removes the rows of subjects that no longer exist. Safe while the
+/// site runs.
+pub async fn backfill(db: &DatabaseConnection, keyring: &Keyring) -> rustcms::AppResult<BackfillReport> {
     let mut report = BackfillReport::default();
+    {
+        let txn = rustcms::db::begin_write(db).await?;
+        let general = rustcms::settings::load::<GeneralSettings, _>(&txn, keyring).await?;
+        let seo = rustcms::settings::load::<SeoSettings, _>(&txn, keyring).await?;
+        sync_settings(&txn, SettingsImages::General, general.logo).await?;
+        sync_settings(&txn, SettingsImages::Seo, seo.og_image).await?;
+        txn.commit().await?;
+        report.subjects += SettingsImages::ALL.len() as u64;
+    }
     for subject in [Subject::Post, Subject::Page] {
         let mut after = 0i64;
         loop {
@@ -179,10 +230,16 @@ pub async fn backfill(db: &DatabaseConnection) -> Result<BackfillReport, DbErr> 
             .await?;
         report.orphans += removed.rows_affected;
     }
-    let unknown = public_media::Entity::delete_many()
-        .filter(public_media::Column::SubjectType.is_not_in([Subject::Post.as_str(), Subject::Page.as_str()]))
+    let groups = SettingsImages::ALL.map(SettingsImages::id);
+    let unknown_groups = public_media::Entity::delete_many()
+        .filter(public_media::Column::SubjectType.eq(SETTINGS))
+        .filter(public_media::Column::SubjectId.is_not_in(groups))
         .exec(db)
         .await?;
+    report.orphans += unknown_groups.rows_affected;
+    let known = [Subject::Post.as_str(), Subject::Page.as_str(), SETTINGS];
+    let unknown =
+        public_media::Entity::delete_many().filter(public_media::Column::SubjectType.is_not_in(known)).exec(db).await?;
     report.orphans += unknown.rows_affected;
     Ok(report)
 }

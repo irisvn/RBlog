@@ -10,7 +10,7 @@ use sea_orm::{ColumnTrait, ConnectionTrait, DbErr, EntityTrait, QueryFilter, Que
 use serde::Serialize;
 use serde_json::Value;
 
-use super::{ImageJson, Links, TermRef, instant};
+use super::{ImageJson, Links, TermRef, instant, media_alt};
 use crate::models::{author_profile, category, page, post, post_tag, tag};
 use crate::services::public_media::body_media_ids;
 
@@ -169,7 +169,12 @@ impl Shared {
 
     fn entry(&self, links: &Links<'_>, s: &Source<'_>, detail: Detail) -> EntryJson {
         let image = |id: Option<Uuid>| id.and_then(|id| self.images.get(&id));
-        let document = detail.html.then(|| s.body.and_then(|body| rich_text::parse(body).ok())).flatten();
+        // Images without their own alternative text get the media's (`html` only: `document`
+        // stays as stored).
+        let document = detail
+            .html
+            .then(|| s.body.and_then(|body| rich_text::parse(&with_media_alts(body, &self.images)).ok()))
+            .flatten();
         let html = detail.html.then(|| document.as_ref().map(|doc| self.html(links, doc)).unwrap_or_default());
         let outline = detail.html.then(|| {
             document
@@ -231,6 +236,33 @@ impl Shared {
             .collect();
         rich_text::to_html_with(doc, &images)
     }
+}
+
+/// `body` with each image that has no alternative text of its own (missing, `null` or blank)
+/// given its media's ([`media_alt`]) when `images` holds that media, or `""`: the document's text
+/// first, then the library's, then none (never the file name). Nothing else changes.
+fn with_media_alts(body: &Value, images: &HashMap<Uuid, media::Model>) -> Value {
+    fn walk(node: &mut Value, images: &HashMap<Uuid, media::Model>) {
+        let Some(object) = node.as_object_mut() else { return };
+        if object.get("type").and_then(Value::as_str) == Some("image")
+            && let Some(attrs) = object.get_mut("attrs").and_then(Value::as_object_mut)
+        {
+            let blank = attrs.get("alt").and_then(Value::as_str).is_none_or(|alt| alt.trim().is_empty());
+            if blank {
+                let media = attrs.get("media").and_then(Value::as_str).and_then(|id| Uuid::parse_str(id).ok());
+                let alt = media.and_then(|id| images.get(&id)).map(media_alt).unwrap_or_default();
+                attrs.insert("alt".into(), Value::String(alt.to_owned()));
+            }
+        }
+        if let Some(Value::Array(children)) = object.get_mut("content") {
+            for child in children {
+                walk(child, images);
+            }
+        }
+    }
+    let mut body = body.clone();
+    walk(&mut body, images);
+    body
 }
 
 /// Name and profile slug of each user in `ids`.

@@ -5,6 +5,7 @@
 use std::collections::BTreeMap;
 
 use rustcms::settings::Settings;
+use sea_orm::prelude::Uuid;
 use serde::{Deserialize, Serialize};
 
 /// The networks a social link may point to (the keys of `social_links`).
@@ -15,7 +16,11 @@ pub const SOCIAL_NETWORKS: [&str; 7] = ["facebook", "x", "instagram", "youtube",
 pub struct SeoSettings {
     pub meta_title: String,
     pub meta_description: String,
-    /// An `https://` image address (text until RustCMS 0.10 brings a media setting kind).
+    /// The default share image: an image of the media library.
+    pub og_image: Option<Uuid>,
+    /// The share image's `https://` address from before `og_image` (RBlog 0.1, a text setting).
+    /// Kept as it was saved, and shown on the page so that it can be cleared: the public settings
+    /// use it only while `og_image` is unset (`services::site`).
     pub og_image_url: Option<String>,
     /// Network (one of [`SOCIAL_NETWORKS`]) → `https://` address of the profile.
     pub social_links: BTreeMap<String, String>,

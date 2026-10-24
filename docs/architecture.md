@@ -1,7 +1,7 @@
 # Architecture
 
 RBlog is the admin back office of a blog and its read-only Content API: one Rust binary on
-RustCMS-Core (v0.10.0) and MySQL 8.4. The public site is a separate Nuxt/Next app
+RustCMS-Core (v0.10.1) and MySQL 8.4. The public site is a separate Nuxt/Next app
 (docs/frontend-integration.html, docs/api.md). This page says where things live and how a change
 travels from the admin to the public site. The database is described in docs/db-design.html.
 
@@ -28,18 +28,18 @@ travels from the admin to the public site. The database is described in docs/db-
 
 | Service | Responsibility |
 |---|---|
-| `publishing` | the only place that changes `status` and `published_at`: submit, publish, schedule, unpublish, `publish_due`. Locks the row, checks the transition and the caller's rights |
+| `publishing` | the only place that changes `status` and `published_at`: submit, publish, schedule, unpublish, `publish_due`. Locks the row, checks the transition and the caller's rights. `Transition::applies` is the one rule of which states a transition leaves: the post and page resources' workflow actions use it in `visible_when` (a row offers only what applies; a run on one record it does not apply to is a 403), and the policy decides only who |
 | `content` | the write path every post/page write goes through (hooks, actions, publishing, revision restore, scheduler) |
 | `content_sync` | the outbox writer (`record_event`), event payloads, `public_path` (the frontend path of a subject) |
 | `events` | dispatches the webhook job in the event's transaction; the poller re-dispatches lost events |
 | `webhook` | signing, SSRF-safe delivery, retryable vs permanent errors |
 | `revisions` | one revision per editorial change (content hash), 30 kept, restore with permission and reference checks |
-| `public_media` | which media the public may download, per subject (images anywhere in a body, callouts included, through `rich_text::media_ids`); `sync` and `backfill` |
-| `preview` | preview tokens (hashed, one hour, revocable) and the frontend preview link |
+| `public_media` | which media the public may download, per subject (images anywhere in a body, callouts included, through `rich_text::media_ids`; the logo and default share image, subject `settings`, written by the settings pages' `after_save`); `sync`, `sync_settings` and `backfill` |
+| `preview` | preview tokens (hashed, one hour, revocable) and the frontend preview link, issued by `issue_link_in` for both the record page's preview card (`routes::admin`) and the Preview action |
 | `search` | the accent-free normalizer, plain text of a rich-text document (version 1 or 2: table cells, callouts and image captions included, embeds not), the LIKE pattern for `q` |
 | `slug`, `taxonomy`, `authors`, `menus` | slugs and slug history; category, tag, author and menu rules |
 | `content_api` | the frontend system user, its `content-reader` role, issuing and revoking Content API keys |
-| `site` | the public settings the Content API returns |
+| `site` | the public settings the Content API returns (logo and share image as public images; the old `og_image_url` as a fallback) |
 | `media_disk` | moving the media library between disks |
 
 ## How a change reaches the public site
@@ -84,7 +84,12 @@ such a body is saved.
 - "Public" means `status = published`, `published_at <= now`, not trashed (`post::public_at`).
   The Content API, sitemap, menus, public media and dashboard counts all use it.
 - Secrets (webhook secret, API keys, preview tokens) never reach logs, the audit log, job
-  payloads or responses (except the one-time key display).
+  payloads or responses (except the one-time key display, and a preview link to the user who
+  asked for it). The Preview action's link is part of its outcome, which RustCMS keeps in the
+  action's idempotency receipt (shown again only to that user, on a retry): the token there
+  is a one-hour, single-post read, and expires with the link.
+- Settings saves that change what the public site shows (General, Reading, SEO) record
+  `settings.updated` in their `after_save`, in the save's transaction.
 - MySQL 8.4 only, `utf8mb4_0900_bin`; migrations only add and re-run safely (CLAUDE.md §1).
 
 ## Roles

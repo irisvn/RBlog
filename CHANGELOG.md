@@ -2,6 +2,42 @@
 
 ## [Unreleased]
 
+### RustCMS 0.10.1: row actions, preview action, media settings, alt texts
+
+- RustCMS-Core v0.10.1 (run `rustcms migrate`: it adds `media.alt`; a 0.10.0 binary then needs
+  `migrate --allow-newer`).
+- **Row actions**: each post and page row offers only the transitions that apply to its status
+  (`services::publishing::Transition::applies`): Publish is the row's labelled action; Submit for
+  review, Schedule…, Preview and Unpublish (last, after a separator) are in its ⋯ menu, and so on
+  record pages. A transition run on one record it does not apply to is now refused with 403
+  (before: 200 with the record in `denied`); a selection skips those records (`denied`).
+  Rescheduling a scheduled post stays possible (Schedule… is offered on drafts, pending and
+  scheduled posts). The Schedule dialog's button reads "Hẹn giờ".
+- **Preview action** on post and page rows and pages: opens the public site's preview in a new
+  tab (a fresh one-hour link). Without a public site URL, or with an `http://localhost` one, it
+  says so and makes no link. The record page's preview card stays, for the link to copy and its
+  expiry; both issue links through `services::preview::issue_link_in`.
+- **Revisions**: "Restore this version" is the labelled action of each row of a post's or page's
+  Revisions table.
+- **Narrow screens**: list columns other than the title (or name) and the status hide below 768
+  or 640 px (`hide_below`).
+- **Media settings**: Settings → General has a **Logo** (PNG, WebP or JPEG, 1 MB) and SEO a
+  **Default share image** (an image, 5 MB), both from the media library. The old share image URL
+  is kept, shown as "Old share image URL", and used only while no share image is chosen. Both
+  images are public through `public_media` (subject `settings`, rebuilt by
+  `content:sync-public-media`).
+- **Content API (breaking)**: `GET /settings` returns `logo` and `seo.og_image` as
+  `{url, width, height, alt}` or `null`; `seo.og_image_url` is gone (its value, while no image is
+  chosen, is `seo.og_image.url`).
+- **Alt texts**: `cover.alt`, avatars and images in `html` use the document's alternative text,
+  then the media library's, then `""`; never the file name any more.
+- **Outbox**: saving General, Reading or SEO settings records `settings.updated` (tag
+  `settings`); Integrations records nothing.
+- The demo seeder gives its first five posts covers, small images drawn by the seeder with
+  Vietnamese alternative texts.
+- The dashboard's resource cards follow registration order since RustCMS 0.10.1: posts and pages
+  are registered first.
+
 ### RustCMS 0.10 and rich text version 2
 
 - RustCMS-Core v0.10.0. The post and page editor gains tables, YouTube and Vimeo embeds, info and

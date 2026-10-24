@@ -1,15 +1,19 @@
 //! The admin page of [`GeneralSettings`] (`/admin/settings/general`): which fields the form
 //! shows and how they are checked.
 
-use rustcms::ValidationErrors;
 use rustcms::admin::{Ctx, SettingField, SettingsMeta, SettingsPage};
-use rustcms::async_trait;
+use rustcms::{AppResult, AppState, ValidationErrors, async_trait};
+use sea_orm::DatabaseTransaction;
 
+use crate::services::content_sync;
+use crate::services::public_media::{self, SettingsImages};
 use crate::settings::general_settings::{GeneralSettings, POSTS_PER_PAGE};
 use crate::settings::rules::{checked, filled, is_web_url};
 
-// TODO(C1): emit the `settings` outbox event after a save, once RustCMS 0.9 gives
-// `SettingsPage` an after-save hook (0.8.2 has none).
+/// The logo's accepted types and size.
+pub const LOGO_TYPES: [&str; 3] = ["image/png", "image/webp", "image/jpeg"];
+pub const LOGO_MAX_BYTES: u64 = 1_000_000;
+
 #[async_trait]
 impl SettingsPage for GeneralSettings {
     fn meta() -> SettingsMeta {
@@ -30,6 +34,11 @@ impl SettingsPage for GeneralSettings {
                 .url()
                 .help("An https address, for example https://example.com (http only for localhost)"),
             SettingField::integer("posts_per_page").label("Posts per page").help("Between 1 and 100"),
+            SettingField::media("logo")
+                .label("Logo")
+                .accept(&LOGO_TYPES)
+                .max_size(LOGO_MAX_BYTES)
+                .help("PNG, WebP or JPEG, at most 1 MB. The public site shows it in its header."),
         ]
     }
 
@@ -47,5 +56,18 @@ impl SettingsPage for GeneralSettings {
             errors.add("posts_per_page", format!("must be between 1 and {}", POSTS_PER_PAGE.end()));
         }
         checked(errors)
+    }
+
+    /// The logo is public while it is set (`public_media`), and the public site learns of the
+    /// change (`settings.updated`).
+    async fn after_save(
+        _state: &AppState,
+        _ctx: &Ctx,
+        txn: &DatabaseTransaction,
+        _before: &Self,
+        after: &Self,
+    ) -> AppResult<()> {
+        public_media::sync_settings(txn, SettingsImages::General, after.logo).await?;
+        content_sync::settings_changed(txn).await
     }
 }

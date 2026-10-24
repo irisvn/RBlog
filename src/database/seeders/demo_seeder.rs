@@ -6,7 +6,8 @@
 //! - 3 authors (users with a random password nobody knows, and their author profiles);
 //! - 4 categories and 8 tags;
 //! - 20 posts: 9 published at different past dates, 3 scheduled, 3 pending review, 3 drafts and
-//!   2 in the trash;
+//!   2 in the trash; the first five have a cover, an image of the media library drawn by
+//!   `demo_images` with its alternative text in Vietnamese;
 //! - 2 pages (Giới thiệu, Liên hệ) and the `primary` and `footer` menus.
 //!
 //! Users are created through `RbacService` (their own transactions); the content is written in
@@ -25,6 +26,7 @@ use sea_orm::{
 };
 use serde_json::{Value, json};
 
+use super::demo_images;
 use crate::models::{author_profile, category, menu, menu_item, page, post, post_tag, tag};
 use crate::services::authors::{self, NewProfile};
 use crate::services::content::Kind;
@@ -328,7 +330,8 @@ impl Seeder for DemoSeeder {
         seed_profiles(&txn, &users, &mut audit).await?;
         let categories = seed_categories(&txn, &mut audit).await?;
         let tags = seed_tags(&txn, &mut audit).await?;
-        seed_posts(&txn, &users, &categories, &tags, &mut audit).await?;
+        let storage = rustcms::storage::of(state);
+        seed_posts(&txn, storage.as_deref(), &users, &categories, &tags, &mut audit).await?;
         let pages = seed_pages(&txn, users[0].id, &mut audit).await?;
         seed_menus(&txn, &categories, &pages, &mut audit).await?;
         audit::record_all(&txn, &AuditContext::system(Some("db:seed --class demo")), audit).await?;
@@ -467,6 +470,7 @@ fn at(unix_seconds: i64) -> DateTimeUtc {
 
 async fn seed_posts(
     txn: &DatabaseTransaction,
+    storage: Option<&dyn rustcms::storage::Storage>,
     users: &[user::Model],
     categories: &[(String, i64)],
     tags: &[(String, i64)],
@@ -501,9 +505,15 @@ async fn seed_posts(
                 (created_at, shifted(created_at, (1 + n % 3) * DAY))
             }
         };
+        // A cover for the first posts, uploaded by their author (without a media library: none).
+        let cover = match (storage, demo_images::IMAGES.get(n as usize)) {
+            (Some(storage), Some(image)) => Some(demo_images::ensure(txn, storage, users[author].id, *image).await?.id),
+            _ => None,
+        };
         let made = post::ActiveModel {
             title: Set(title.into()),
             slug: Set(slug),
+            cover_media_id: Set(cover),
             excerpt: Set(Some(excerpt.into())),
             body: Set(Some(body)),
             category_id: Set(Some(id_of(categories, category_slug)?)),

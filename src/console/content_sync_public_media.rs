@@ -16,7 +16,7 @@ impl AppCommand for ContentSyncPublicMedia {
     }
 
     async fn run(&self, state: &AppState, _args: &rustcms::clap::ArgMatches) -> anyhow::Result<()> {
-        let report = public_media::backfill(state.db()).await?;
+        let report = public_media::backfill(state.db(), state.keyring()).await?;
         println!(
             "Synced the public media of {} post(s), page(s) and author(s); removed {} row(s) of deleted content.",
             report.subjects, report.orphans

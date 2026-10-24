@@ -60,19 +60,26 @@ fn file_name(name: &str) -> String {
 }
 
 /// An image: `{url, width, height, alt}`.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ImageJson {
     pub url: String,
     pub width: Option<i32>,
     pub height: Option<i32>,
-    /// The media's name, until media get alt texts.
+    /// The media's alternative text ([`media_alt`]); `""` without one, never the file name.
     pub alt: String,
 }
 
 impl ImageJson {
     pub fn new(links: &Links<'_>, media: &media::Model) -> Self {
-        Self { url: links.url(media), width: media.width, height: media.height, alt: media.name.clone() }
+        Self { url: links.url(media), width: media.width, height: media.height, alt: media_alt(media).to_owned() }
     }
+}
+
+/// The alternative text of `media` as the library holds it (Media → the file → Alt text), or
+/// `""`: what an image shows when its document gives none. Never the file name, which describes
+/// nothing to a reader.
+pub fn media_alt(media: &media::Model) -> &str {
+    media.alt.as_deref().map(str::trim).unwrap_or_default()
 }
 
 /// A category or tag a post points to: `{slug, name}`.

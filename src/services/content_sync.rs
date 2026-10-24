@@ -134,6 +134,14 @@ pub async fn menu_changed(txn: &DatabaseTransaction, change: Change, id: i64, ke
     record_event(txn, &format!("menu.{}", change.as_str()), "menu", Some(id), menu_payload(key)).await
 }
 
+/// A public settings group (General, Reading, SEO and social) was saved: the public site
+/// revalidates what it caches under the tag `settings` (its layout: name, logo, menus' homepage,
+/// SEO defaults). Settings → Integrations is not public and records none.
+pub async fn settings_changed(txn: &DatabaseTransaction) -> AppResult<()> {
+    let payload = json!({ "tags": ["settings"], "paths": { "old": [], "new": [] } });
+    record_event(txn, "settings.updated", "settings", None, payload).await
+}
+
 /// The user a hook or action runs for (`None` for a principal that is not a user).
 pub fn actor_id(ctx: &rustcms::admin::Ctx) -> Option<i64> {
     ctx.principal.id.parse().ok()
