@@ -34,7 +34,12 @@ pub fn provider() -> AdminProvider {
         .resource::<crate::admin::resources::tag_resource::TagResource>()
         .resource::<crate::admin::resources::menu_resource::MenuResource>()
         .resource::<crate::admin::resources::menu_item_resource::MenuItemResource>()
+        .resource::<crate::admin::resources::author_profile_resource::AuthorProfileResource>()
+        // The target of `belongs_to("users")` (read only, no navigation entry).
+        .resource::<crate::admin::resources::user_resource::UserResource>()
         // rustcms:resources
+        // Widgets above the resource cards (`admin::dashboard`).
+        .dashboard(crate::admin::dashboard::dashboard())
         // Integrations: the Content API keys of the public site (a React page on `routes::admin`).
         .page::<crate::admin::pages::content_api_page::ContentApiPage>()
         // rustcms:pages

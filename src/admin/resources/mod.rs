@@ -8,10 +8,12 @@ use serde_json::Value;
 use crate::services::content_sync;
 use crate::services::taxonomy::{self, Taxonomy};
 
+pub mod author_profile_resource;
 pub mod category_resource;
 pub mod menu_item_resource;
 pub mod menu_resource;
 pub mod tag_resource;
+pub mod user_resource;
 // rustcms:resource-mods
 
 /// `error` with the messages of its field and form errors translated (`ctx.t_in(slug, …)`):

@@ -18,6 +18,7 @@ impl ServiceProvider for AppServiceProvider {
         // `rustcms db:seed` runs this one (it calls the others).
         app.seeder(crate::database::seeders::DatabaseSeeder);
         app.seeder(crate::database::seeders::content_api_seeder::ContentApiSeeder);
+        app.seeder(crate::database::seeders::demo_seeder::DemoSeeder);
         // rustcms:seeders
         app.job::<crate::jobs::deliver_content_event::DeliverContentEvent>();
         // rustcms:jobs

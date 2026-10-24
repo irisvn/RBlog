@@ -95,6 +95,19 @@ pub async fn tag_changed(
     record_event(txn, &format!("tag.{}", change.as_str()), "tag", Some(id), payload).await
 }
 
+/// An author profile was created, updated or deleted (see [`category_changed`]; `id` is the
+/// user's). Posts show their author, and the sitemap lists author pages.
+pub async fn author_changed(
+    txn: &DatabaseTransaction,
+    change: Change,
+    id: i64,
+    slug: &str,
+    old_slugs: &[String],
+) -> AppResult<()> {
+    let payload = taxonomy_payload("author", change, slug, old_slugs);
+    record_event(txn, &format!("author.{}", change.as_str()), "author", Some(id), payload).await
+}
+
 /// A menu, or one of its items, was created, updated or deleted: `change` is what happened to
 /// the menu itself (an item change is an update of its menu).
 pub async fn menu_changed(txn: &DatabaseTransaction, change: Change, id: i64, key: &str) -> AppResult<()> {
@@ -115,7 +128,7 @@ pub fn public_path(subject_type: &str, slug: &str) -> String {
     }
 }
 
-/// The payload of a category or tag change (`kind`: `category` or `tag`).
+/// The payload of a category, tag or author change (`kind`: `category`, `tag` or `author`).
 pub fn taxonomy_payload(kind: &str, change: Change, slug: &str, old_slugs: &[String]) -> Value {
     let mut tags = vec![format!("{kind}:{slug}")];
     let mut old: Vec<String> = Vec::new();
