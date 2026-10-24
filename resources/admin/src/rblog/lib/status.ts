@@ -24,3 +24,21 @@ export function keyStatus(expiresAt: string | null, now = Date.now()): [Tone, st
   const expired = expiresAt != null && new Date(expiresAt).getTime() <= now;
   return expired ? ["off", "Expired"] : ["ok", "Active"];
 }
+
+/** Where the running build stands against the releases (`services::version::state`). */
+export function versionStatus(state: string): [Tone, string] {
+  switch (state) {
+    case "update":
+      return ["busy", "Update available"];
+    case "current":
+      return ["ok", "Up to date"];
+    case "no_release":
+      return ["off", "No release yet"];
+    case "not_checked":
+      return ["off", "Not checked"];
+    case "not_compared":
+      return ["off", "Not compared"];
+    default:
+      return ["off", state];
+  }
+}

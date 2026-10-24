@@ -102,6 +102,92 @@ window.rustcms?.registerTranslations?.("vi", {
   Copied: "Đã copy",
   "Key copied": "Đã copy khoá",
   "Could not copy. Select the key and copy it.": "Không copy được. Hãy chọn khoá rồi copy.",
+
+  // Version status words (lib/status.ts)
+  "Update available": "Có bản cập nhật",
+  "Up to date": "Mới nhất",
+  "No release yet": "Chưa có bản phát hành",
+  "Not checked": "Chưa kiểm tra",
+  "Not compared": "Không so sánh",
+
+  // Version (version.tsx)
+  System: "Hệ thống",
+  Version: "Phiên bản",
+  "What RBlog runs, and whether a newer release is out. RBlog never updates itself: you update the containers.":
+    "RBlog đang chạy bản nào, và đã có bản mới chưa. RBlog không bao giờ tự cập nhật: bạn tự cập nhật container.",
+  "Check now": "Kiểm tra ngay",
+  "Checking…": "Đang kiểm tra…",
+  Checked: "Đã kiểm tra",
+  "RBlog {version} is out": "Đã có RBlog {version}",
+  "The check failed": "Kiểm tra thất bại",
+  "Checked less than a minute ago. Try again shortly.": "Vừa kiểm tra chưa đầy một phút. Hãy thử lại sau ít giây.",
+  "GitHub did not answer in time.": "GitHub không trả lời kịp.",
+  "GitHub could not be reached. Check the server's internet access and DNS.":
+    "Không kết nối được tới GitHub. Hãy kiểm tra kết nối Internet và DNS của server.",
+  "GitHub's rate limit was reached. The next check will try again.":
+    "Đã chạm giới hạn truy vấn của GitHub. Lần kiểm tra sau sẽ thử lại.",
+  "GitHub answered with an error (HTTP {status}).": "GitHub trả về lỗi (HTTP {status}).",
+  "GitHub's answer was too large to read.": "Phản hồi của GitHub quá lớn để đọc.",
+  "GitHub's answer could not be read.": "Không đọc được phản hồi của GitHub.",
+  "GitHub's 20 newest releases are all drafts or prereleases: the newest stable release was not found.":
+    "20 bản mới nhất trên GitHub đều là bản nháp hoặc bản thử nghiệm: không tìm thấy bản ổn định mới nhất.",
+  "A newer version of RBlog migrated this database ({names}). This version runs on it as it is: update again, or restore the backup made before the update.":
+    "Một phiên bản RBlog mới hơn đã migrate database này ({names}). Phiên bản này vẫn chạy trên database như hiện tại: hãy cập nhật lại, hoặc khôi phục bản sao lưu đã tạo trước khi cập nhật.",
+  Running: "Đang chạy",
+  RBlog: "RBlog",
+  Build: "Bản build",
+  Release: "Bản phát hành",
+  "Development build": "Bản phát triển",
+  "Built from source": "Build từ mã nguồn",
+  Commit: "Commit",
+  Unknown: "Không rõ",
+  Image: "Image",
+  "Not a release image": "Không phải image phát hành",
+  "RustCMS Core": "RustCMS Core",
+  MySQL: "MySQL",
+  Started: "Khởi động",
+  "Release check": "Kiểm tra bản mới",
+  "RBlog asks GitHub for new releases every {hours} hours, and sends nothing about this server.":
+    "Cứ {hours} giờ RBlog hỏi GitHub một lần xem có bản mới không, và không gửi thông tin gì về server này.",
+  "RBlog {version} is available": "Có bản mới {version}",
+  "This is the newest release": "Đã là bản mới nhất",
+  "No release of RBlog is published yet.": "RBlog chưa có bản phát hành nào.",
+  "Not checked yet. Check now, or wait for the next automatic check.":
+    "Chưa kiểm tra. Hãy bấm Kiểm tra ngay, hoặc chờ lần kiểm tra tự động tiếp theo.",
+  "The newest release is {version}.": "Bản phát hành mới nhất là {version}.",
+  "No release is known yet.": "Chưa biết bản phát hành nào.",
+  "This is a development build: it is not compared with releases. Install a release image to be told about updates.":
+    "Đây là bản phát triển: không được so sánh với các bản phát hành. Hãy cài image phát hành để được báo khi có bản mới.",
+  "This build was made from source: it is not compared with releases. Install a release image to be told about updates.":
+    "Bản này được build từ mã nguồn: không được so sánh với các bản phát hành. Hãy cài image phát hành để được báo khi có bản mới.",
+  "The last check failed": "Lần kiểm tra gần nhất thất bại",
+  "What is shown is from {when}.": "Thông tin đang hiện là từ {when}.",
+  "Last checked": "Kiểm tra lần cuối",
+  "Newest release": "Bản phát hành mới nhất",
+  "You can check again in {seconds} s.": "Có thể kiểm tra lại sau {seconds} giây.",
+  "What's new in {version}": "Có gì mới trong {version}",
+  "Published {date}.": "Phát hành lúc {date}.",
+  "View on GitHub": "Xem trên GitHub",
+  "This release has no notes.": "Bản này không có ghi chú phát hành.",
+  "How to update": "Cách cập nhật",
+  "In the directory that holds compose.yml, .env and rblog.env on the server (docs/deployment.md).":
+    "Chạy trong thư mục chứa compose.yml, .env và rblog.env trên server (docs/deployment.md).",
+  "Back up the database": "Sao lưu database",
+  "Database backup": "Sao lưu database",
+  "Keep the file until the new version runs well. With the local disk, back up the storage volume too.":
+    "Giữ file này đến khi bản mới chạy ổn. Nếu dùng ổ đĩa local, hãy sao lưu cả volume storage.",
+  "Choose the version": "Chọn phiên bản",
+  "Set it in .env (or leave RBLOG_VERSION out to follow latest, {image}:latest).":
+    "Đặt trong .env (hoặc bỏ RBLOG_VERSION để luôn dùng bản mới nhất, {image}:latest).",
+  "Pull the image and restart": "Tải image và khởi động lại",
+  Update: "Cập nhật",
+  "The container runs the database migrations when it starts, then serves. Check /health and sign in again.":
+    "Khi khởi động, container chạy migration database rồi mới phục vụ. Hãy kiểm tra /health và đăng nhập lại.",
+  "Roll back if needed": "Quay lại bản cũ nếu cần",
+  "Put the previous version back in .env (RBLOG_VERSION={previous}) and run the same command. If the newer version migrated the database, the older one refuses to start: set RUSTCMS_DATABASE__ALLOW_NEWER_MIGRATIONS=true in rblog.env only when the release notes say its migrations only add; otherwise restore the backup.":
+    "Đặt lại phiên bản cũ trong .env (RBLOG_VERSION={previous}) rồi chạy cùng lệnh. Nếu bản mới đã migrate database, bản cũ sẽ không chịu khởi động: chỉ đặt RUSTCMS_DATABASE__ALLOW_NEWER_MIGRATIONS=true trong rblog.env khi ghi chú phát hành nói migration của nó chỉ thêm mới; nếu không, hãy khôi phục bản sao lưu.",
+  "Restore the backup (RBlog stopped meanwhile)": "Khôi phục bản sao lưu (tạm dừng RBlog trong lúc đó)",
+  "Deployment guide": "Hướng dẫn triển khai",
 });
 
 export {};

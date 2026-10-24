@@ -189,6 +189,18 @@ db_test!(only_integrations_permissions_give_access, migrate = Migrator, |db: Tes
                 .expect("nobody", &nobody, StatusCode::FORBIDDEN)
                 .expect("manager", &manager, StatusCode::FORBIDDEN)
                 .expect("super admin", &admin, StatusCode::NOT_FOUND),
+            // The Version page (tests/feature/version.rs covers it in full): `system.version`.
+            // A check answers 200 even when the releases cannot be read (it says why).
+            Case::new(Method::GET, "/system/version")
+                .expect("anonymous", &anonymous, StatusCode::UNAUTHORIZED)
+                .expect("nobody", &nobody, StatusCode::FORBIDDEN)
+                .expect("manager", &manager, StatusCode::FORBIDDEN)
+                .expect("super admin", &admin, StatusCode::OK),
+            Case::new(Method::POST, "/system/version/check")
+                .expect("anonymous", &anonymous, StatusCode::UNAUTHORIZED)
+                .expect("nobody", &nobody, StatusCode::FORBIDDEN)
+                .expect("manager", &manager, StatusCode::FORBIDDEN)
+                .expect("super admin", &admin, StatusCode::OK),
         ],
     )
     .await;

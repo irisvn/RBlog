@@ -11,17 +11,17 @@ travels from the admin to the public site. The database is described in docs/db-
 |---|---|
 | `src/bootstrap/` | the app from its providers, in order (storage before the admin panel) |
 | `src/providers/` | auth (permissions, presets, labels), admin panel (theme, resources, settings, pages, dashboard), app (jobs, schedules, seeders, commands) |
-| `src/routes/` | `api.rs`: the Content API, public media and preview; `admin.rs`: panel JSON routes (content keys, preview links) |
+| `src/routes/` | `api.rs`: the Content API, public media and preview; `admin.rs`: panel JSON routes (content keys, preview links, version) |
 | `src/http/` | `controllers/content/*` (the Content API), `resources/content/*` (its JSON shapes), `requests/` |
-| `src/models/` | SeaORM entities; `post::public_at(now)` is the one definition of "public" |
+| `src/models/` | SeaORM entities; `post::public_at(now)` is the one definition of "public"; `release_check`: the last release check (one row) |
 | `src/services/` | business rules (below) |
-| `src/policies/` | `content.rs`: the permission matrix for posts and pages, used by `content_policy.rs` (posts, pages), `revision_policy.rs` (their revisions, through the parent), publishing and revisions; `post_author_policy.rs` and `user_lookup_policy.rs` (the author and user lookups) |
-| `src/admin/` | `resources/` (posts, pages and their revisions, categories, tags, menus and menu items, author profiles, and the read-only post-author and user lookups), `pages/` (General, Reading, SEO and Integrations settings, Content API), `slots/` (preview), `dashboard.rs` |
+| `src/policies/` | `content.rs`: the permission matrix for posts and pages, used by `content_policy.rs` (posts, pages), `revision_policy.rs` (their revisions, through the parent), publishing and revisions; `post_author_policy.rs` and `user_lookup_policy.rs` (the author and user lookups); `release_update_policy.rs` (the release notice, `system.version`) |
+| `src/admin/` | `resources/` (posts, pages and their revisions, categories, tags, menus and menu items, author profiles, and the read-only post-author and user lookups, and `release_updates`, the dashboard's notice of a newer release), `pages/` (General, Reading, SEO and Integrations settings, Content API, Version), `slots/` (preview), `dashboard.rs` |
 | `src/settings/` | General, Reading, SEO, Integrations; `rules.rs` checks URLs, paths and slugs |
 | `src/jobs/` | `publish_due`, `deliver_content_event`, `redispatch_content_events` |
-| `src/console/` | `media:move-disk`, `content:sync-public-media` |
+| `src/console/` | `media:move-disk`, `content:sync-public-media`, `version:check` |
 | `src/database/` | migrations; seeders `DatabaseSeeder` (runs `ContentApiSeeder` and `RoleSeeder`) and `DemoSeeder` (`--class demo`, with the cover images of `demo_images.rs`) |
-| `resources/admin/` | React pages (Content API keys, preview slot, status and option-label cells) and the shared components in `src/rblog/lib/` |
+| `resources/admin/` | React pages (Content API keys, Version, preview slot, status and option-label cells) and the shared components in `src/rblog/lib/` |
 | `tests/feature/` | one test binary on MySQL (`db_test!`) |
 
 ## Services
@@ -41,6 +41,7 @@ travels from the admin to the public site. The database is described in docs/db-
 | `content_api` | the frontend system user, its `content-reader` role, issuing and revoking Content API keys |
 | `site` | the public settings the Content API returns (logo and share image as public images; the old `og_image_url` as a fallback) |
 | `media_disk` | moving the media library between disks |
+| `version` | what this build is (`build.rs`: version, commit, channel `release`/`development`/`source`), checking GitHub's releases of `irisvn/RBlog` (fixed URL, anonymous, bounded; every 6 hours and by hand at most once a minute), the result in `release_checks`; only release builds are compared |
 
 ## How a change reaches the public site
 
@@ -111,6 +112,20 @@ such a body is saved.
 admin permission declared at that moment, the others the lists of
 `src/database/seeders/role_seeder.rs`, which are also the Roles page's presets. An existing role
 is never changed. Permissions declared after a role was seeded must be granted on the Roles page.
+
+## Version and releases
+
+The Version page (Integrations → Version, `system.version`) says what runs and whether a newer
+release is out; RBlog never updates itself (docs/deployment.md). `build.rs` compiles in the
+version, the commit and the channel: `release` when `.github/workflows/release.yml` passes
+`RBLOG_VERSION` (a `vX.Y.Z` tag), `development` with a commit or on CI, `source` otherwise.
+`services::version::check` asks GitHub's releases (schedule `release-check`, every 6 hours, once
+per slot across instances; "Check now", 429 within a minute of the last check), keeps the newest
+non-draft, non-prerelease `vX.Y.Z` release with its notes as text in `release_checks` (one row;
+a check writes its result only if no newer check started meanwhile), and keeps the last good
+result when a check fails. The dashboard's notice is a `recent` widget over the read-only
+resource `release_updates`, whose scope shows the row only while its release is newer than a
+release build: RustCMS 0.10.3 has no dashboard slot or banner.
 
 ## Tests and CI
 

@@ -13,9 +13,23 @@ use serde_json::json;
 ///
 /// | Widget | Shows | Needs |
 /// |---|---|---|
+/// | `rblog_update` | a newer RBlog release, while there is one (Integrations → Version) | `system.version` |
 /// | `authors` | author profiles | `dashboard.authors`, `authors.view_any`, `authors.view` |
+///
+/// `rblog_update` is the administrators' notice of a newer release: RustCMS 0.10.3 has no
+/// dashboard slot or banner, so it is a `recent` widget over `release_updates`, whose scope keeps
+/// the row only while its release is newer than a release build (`admin::resources::
+/// release_update_resource`). While up to date it lists nothing.
 pub fn dashboard() -> Dashboard {
-    Dashboard::new().widget(Widget::stat("authors", "authors").label("Authors"))
+    Dashboard::new()
+        .widget(
+            Widget::recent("rblog_update", "release_updates")
+                .label("New RBlog release")
+                .columns(&["published_at"])
+                .limit(1)
+                .permission(crate::services::version::PERMISSION),
+        )
+        .widget(Widget::stat("authors", "authors").label("Authors"))
 }
 
 /// The post widgets, to add to [`dashboard`] (`with_post_widgets(Dashboard::new()…)`) once the

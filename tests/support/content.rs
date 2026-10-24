@@ -25,6 +25,8 @@ pub async fn app(db: TestDb) -> TestApp {
     let config = test_config(db.url())
         .with("storage.root", root.to_string_lossy().as_ref())
         .and_then(|c| c.with("app.url", format!("{APP_URL}/")))
+        // Release checks (the Version page) never leave the machine here: nobody listens on port 1.
+        .and_then(|c| c.with("releases.url", "http://127.0.0.1:1/releases"))
         .expect("test configuration");
     TestApp::with_config(bootstrap::build, config, db).await
 }

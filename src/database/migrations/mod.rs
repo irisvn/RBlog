@@ -12,6 +12,7 @@ mod m20261023_183014_create_author_profiles_table;
 mod m20261023_183015_create_content_sync_tables;
 mod m20261023_190924_add_delivery_columns_to_content_events;
 mod m20261024_020523_add_subject_index_to_content_events;
+mod m20261024_150000_create_release_checks_table;
 // rustcms:migration-mods
 
 pub struct Migrator;
@@ -29,6 +30,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261023_183015_create_content_sync_tables::Migration),
             Box::new(m20261023_190924_add_delivery_columns_to_content_events::Migration),
             Box::new(m20261024_020523_add_subject_index_to_content_events::Migration),
+            Box::new(m20261024_150000_create_release_checks_table::Migration),
             // rustcms:migrations
         ];
         migrations.extend(app);
