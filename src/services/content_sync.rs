@@ -17,7 +17,8 @@
 use rustcms::{AppError, AppResult};
 use sea_orm::prelude::{ChronoUtc, DateTimeUtc, Uuid};
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder,
+    QuerySelect, Set, Statement,
 };
 use serde_json::{Value, json};
 
@@ -149,9 +150,8 @@ pub fn actor_id(ctx: &rustcms::admin::Ctx) -> Option<i64> {
 /// 4. records the outbox event `{post|page}.{change}` with its cache tags and paths
 ///    ([`content_payload`]).
 ///
-/// A form save that also changed tags calls this twice in one transaction (from
-/// `after_relation_change`, then `after_save`): a `created` or `updated` event is recorded once,
-/// as the first call reports everything ([`content_links_changed`]).
+/// A form save that also changes tags runs `after_relation_change`, then `after_save`, in one
+/// transaction: only `after_save` calls this ([`content_links_changed`], [`mark_form_write`]).
 pub async fn content_changed(
     txn: &DatabaseTransaction,
     kind: Kind,
@@ -207,13 +207,9 @@ async fn sync(
     let previous = revisions::latest(txn, kind, id).await?;
     revisions::record(txn, &row, &tag_ids, previous.as_ref(), actor, at, keep_revision).await?;
 
-    let last_event = last_event_at(txn, kind, id).await?;
-    if matches!(change, Change::Created | Change::Updated) && last_event.is_some_and(|e| e >= row.updated_at) {
-        // Reported already by this write (see above).
-        return Ok(());
-    }
-    // Slugs replaced since the last event (a rename in this write).
-    let old_slugs = old_slugs(txn, kind, id, last_event).await?;
+    // The slug this very write replaced: its history row has the write's `updated_at`
+    // (`taxonomy::slug_for_update`).
+    let old_slugs = old_slugs(txn, kind, id, Some(row.updated_at)).await?;
     let mut categories = Vec::new();
     let mut tags = Vec::new();
     if kind == Kind::Post {
@@ -252,22 +248,67 @@ async fn sync(
 
 /// `after_relation_change` of a post's tags. The record is the post as the write stores it:
 ///
-/// - in a create from the form (no event yet, `created_at = updated_at`), the post is reported
-///   as created, with its tags, and `after_save` then records nothing more;
-/// - otherwise (the relation manager, or an edit form), `updated_at` moves to now (links count
-///   as an edit) and the post is reported as updated.
+/// - in a save of the post's form ([`mark_form_write`] marked it), nothing: `after_save` follows
+///   in the same transaction and reports the post with its tags;
+/// - otherwise (the relation manager), `updated_at` moves to now (links count as an edit) and the
+///   post is reported as updated.
 pub async fn content_links_changed(
     txn: &DatabaseTransaction,
     kind: Kind,
     record: &Content,
     actor: Option<i64>,
 ) -> AppResult<()> {
-    let creating = record.created_at == record.updated_at && last_event_at(txn, kind, record.id).await?.is_none();
-    if creating {
-        return content_changed(txn, kind, record.id, Change::Created, actor).await;
+    if form_write_marked(txn, kind, record).await? {
+        return Ok(());
     }
     content::set(txn, kind, record.id, vec![(Col::UpdatedAt, content::value(now()))]).await?;
     content_changed(txn, kind, record.id, Change::Updated, actor).await
+}
+
+/// The connection's mark of a form write in progress (a MySQL session variable: it belongs to
+/// the write's own connection, and holds the record and the instant only this write stores).
+const FORM_WRITE: &str = "@rblog_form_write";
+
+/// What marks a form write of `kind` `id` (`None`: a create) that stores `at` as `updated_at`.
+fn form_mark(kind: Kind, id: Option<i64>, at: DateTimeUtc) -> String {
+    let id = id.map_or_else(|| "new".to_owned(), |id| id.to_string());
+    format!("{}:{id}:{}", kind.subject(), at.timestamp_micros())
+}
+
+/// Marks the save of a post's or page's form, from `mutate_before_create` (`id`: `None`) or
+/// `mutate_before_update`, with the `updated_at` it stores. [`content_links_changed`] then leaves
+/// the event to `after_save`, which clears the mark ([`clear_form_write`]). A write that fails
+/// rolls back before any later write could match: no other write stores that `updated_at`.
+pub async fn mark_form_write(txn: &DatabaseTransaction, kind: Kind, id: Option<i64>, at: DateTimeUtc) -> AppResult<()> {
+    let statement = Statement::from_sql_and_values(
+        txn.get_database_backend(),
+        format!("SET {FORM_WRITE} = ?"),
+        [form_mark(kind, id, at).into()],
+    );
+    txn.execute_raw(statement).await?;
+    Ok(())
+}
+
+/// Clears the mark of [`mark_form_write`] (from `after_save`).
+pub async fn clear_form_write(txn: &DatabaseTransaction) -> AppResult<()> {
+    let statement = Statement::from_string(txn.get_database_backend(), format!("SET {FORM_WRITE} = NULL"));
+    txn.execute_raw(statement).await?;
+    Ok(())
+}
+
+async fn form_write_marked(txn: &DatabaseTransaction, kind: Kind, record: &Content) -> AppResult<bool> {
+    let statement = Statement::from_string(txn.get_database_backend(), format!("SELECT {FORM_WRITE} AS mark"));
+    let mark: Option<String> = match txn.query_one_raw(statement).await? {
+        Some(row) => row.try_get("", "mark").unwrap_or(None),
+        None => None,
+    };
+    let expected = if record.created_at == record.updated_at {
+        [form_mark(kind, None, record.updated_at), form_mark(kind, Some(record.id), record.updated_at)]
+    } else {
+        let mark = form_mark(kind, Some(record.id), record.updated_at);
+        [mark.clone(), mark]
+    };
+    Ok(mark.is_some_and(|m| expected.contains(&m)))
 }
 
 /// `after_force_delete` of a post or page: its row is gone (and, with it, its tags and
@@ -321,33 +362,15 @@ fn media_subject(kind: Kind) -> public_media::Subject {
     }
 }
 
-/// When the newest outbox event of a post or page was recorded (this transaction's included).
-async fn last_event_at(txn: &DatabaseTransaction, kind: Kind, id: i64) -> AppResult<Option<DateTimeUtc>> {
-    Ok(content_event::Entity::find()
-        .select_only()
-        .column_as(content_event::Column::CreatedAt.max(), "at")
-        .filter(content_event::Column::SubjectType.eq(kind.subject()))
-        .filter(content_event::Column::SubjectId.eq(id))
-        .into_tuple::<Option<DateTimeUtc>>()
-        .one(txn)
-        .await?
-        .flatten())
-}
-
-/// The old slugs of a post or page kept since `after` (all of them when `None`).
-async fn old_slugs(
-    txn: &DatabaseTransaction,
-    kind: Kind,
-    id: i64,
-    after: Option<DateTimeUtc>,
-) -> AppResult<Vec<String>> {
+/// The old slugs of a post or page replaced at `at` (all of them when `None`).
+async fn old_slugs(txn: &DatabaseTransaction, kind: Kind, id: i64, at: Option<DateTimeUtc>) -> AppResult<Vec<String>> {
     let mut query = slug_history::Entity::find()
         .select_only()
         .column(slug_history::Column::OldSlug)
         .filter(slug_history::Column::SubjectType.eq(kind.subject()))
         .filter(slug_history::Column::SubjectId.eq(id));
-    if let Some(after) = after {
-        query = query.filter(slug_history::Column::CreatedAt.gt(after));
+    if let Some(at) = at {
+        query = query.filter(slug_history::Column::CreatedAt.eq(at));
     }
     Ok(query.order_by_asc(slug_history::Column::Id).into_tuple().all(txn).await?)
 }

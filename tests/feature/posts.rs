@@ -350,6 +350,27 @@ db_test!(every_write_records_one_outbox_event, migrate = Migrator, |db: TestDb| 
     assert!(events(db, "post", &key).await.iter().all(|e| e.job_id.is_some()));
 });
 
+db_test!(events_do_not_depend_on_the_clock, migrate = Migrator, |db: TestDb| async move {
+    let app = content::app(db).await;
+    let db = app.state().db();
+    let (editor, _) = signed_in(&app, "Biên", EDITOR_ROLE).await;
+    let rust = content::tag(db, "rust", "Rust").await;
+    let key = create(&app, &editor, "posts", json!({"title": "Bài"})).await;
+    // An event written by an instance whose clock runs a day ahead.
+    let ahead = rblog::services::content_sync::now() + std::time::Duration::from_secs(86_400);
+    let mut skewed: rblog::models::content_event::ActiveModel = events(db, "post", &key).await.remove(0).into();
+    skewed.created_at = sea_orm::Set(ahead);
+    sea_orm::ActiveModelTrait::update(skewed, db).await.unwrap();
+    // Later writes are reported all the same: a form save, a form save with tags, a link change.
+    update(&app, &editor, "posts", &key, json!({"title": "Bài 2"})).await.assert_status(StatusCode::OK);
+    update(&app, &editor, "posts", &key, json!({"title": "Bài 3", "tags": {"attach": [rust.id.to_string()]}}))
+        .await
+        .assert_status(StatusCode::OK);
+    let detach = app.admin_api(&format!("resources/posts/records/{key}/relations/tags/detach"));
+    editor.post_json(&detach, &json!({"keys": [rust.id.to_string()]})).await.assert_status(StatusCode::OK);
+    assert_eq!(event_kinds(db, "post", &key).await, ["post.created", "post.updated", "post.updated", "post.updated"]);
+});
+
 db_test!(seeing_every_post_is_not_editing_it, migrate = Migrator, |db: TestDb| async move {
     let app = content::app(db).await;
     let db = app.state().db();

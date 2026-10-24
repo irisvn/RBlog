@@ -39,7 +39,9 @@ pub async fn before_create<E: Taxonomy>(
     let slug = taxonomy::slug_for_create::<E>(txn, &title, typed).await.map_err(|e| translated(ctx, resource, e))?;
     check_canonical(ctx, resource, &mut data)?;
     let me = content_sync::actor_id(ctx).ok_or(rustcms::AppError::Forbidden)?;
-    let now = instant(content_sync::now());
+    let at = content_sync::now();
+    content_sync::mark_form_write(txn, kind_of::<E>(), None, at).await?;
+    let now = instant(at);
     data.insert("title".into(), Value::String(title));
     data.insert("slug".into(), Value::String(slug));
     data.insert("author_id".into(), Value::String(me.to_string()));
@@ -80,7 +82,13 @@ pub async fn before_update<E: Taxonomy>(
         None => data.remove("slug"),
     };
     data.insert("updated_at".into(), instant(now));
+    content_sync::mark_form_write(txn, kind_of::<E>(), Some(current.id), now).await?;
     Ok(data)
+}
+
+/// Posts or pages.
+fn kind_of<E: Taxonomy>() -> Kind {
+    if E::SUBJECT == "page" { Kind::Page } else { Kind::Post }
 }
 
 /// A canonical URL is an `http(s)://` address; a blank one is none.
@@ -119,6 +127,7 @@ pub fn is_web_address(url: &str) -> bool {
 
 /// `after_save`: a create (equal timestamps, set by [`before_create`]) or an update.
 pub async fn saved(ctx: &Ctx, txn: &DatabaseTransaction, content: Content) -> AppResult<()> {
+    content_sync::clear_form_write(txn).await?;
     let change = if content.created_at == content.updated_at { Change::Created } else { Change::Updated };
     content_sync::content_changed(txn, content.kind, content.id, change, content_sync::actor_id(ctx)).await
 }

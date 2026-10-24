@@ -1,9 +1,9 @@
 use rustcms::async_trait;
 use rustcms::migration::*;
 
-/// `content_events (subject_type, subject_id, created_at)`: every write of a post or page reads
-/// the newest event of its subject (`services::content_sync::content_changed`), and the
-/// scheduler does it for each post that falls due. Without it, each read scans the outbox.
+/// `content_events (subject_type, subject_id, created_at)`: the events of one post, page, category,
+/// tag or menu, newest first (what an operator, or a test, looks up when a page was not
+/// revalidated). Without it, each such read scans the whole outbox.
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 

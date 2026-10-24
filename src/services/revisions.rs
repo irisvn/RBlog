@@ -9,6 +9,7 @@
 
 use std::collections::BTreeSet;
 
+use rustcms::admin::media::entity as media;
 use rustcms::admin::{Ctx, rich_text};
 use rustcms::audit::AuditEntry;
 use rustcms::{AppError, AppResult};
@@ -355,13 +356,20 @@ async fn restore_tags(
     post_id: i64,
     wanted: &[i64],
 ) -> AppResult<()> {
-    let existing: BTreeSet<i64> = if wanted.is_empty() {
+    let current = rows::tag_ids(txn, Kind::Post, post_id).await?;
+    // The tags it has and the ones it gets back, locked (shared) in key order before the links
+    // are rewritten, as the panel's link writes do: a tag deleted meanwhile waits for this
+    // write instead of crossing it.
+    let involved: BTreeSet<i64> = current.iter().chain(wanted).copied().collect();
+    let existing: BTreeSet<i64> = if involved.is_empty() {
         BTreeSet::new()
     } else {
         tag::Entity::find()
             .select_only()
             .column(tag::Column::Id)
-            .filter(tag::Column::Id.is_in(wanted.iter().copied()))
+            .filter(tag::Column::Id.is_in(involved.iter().copied()))
+            .order_by_asc(tag::Column::Id)
+            .lock_shared()
             .into_tuple::<i64>()
             .all(txn)
             .await?
@@ -369,7 +377,6 @@ async fn restore_tags(
             .collect()
     };
     let wanted: Vec<i64> = wanted.iter().copied().filter(|id| existing.contains(id)).collect();
-    let current = rows::tag_ids(txn, Kind::Post, post_id).await?;
     if current == wanted {
         return Ok(());
     }
@@ -410,13 +417,22 @@ pub async fn media_usable(ctx: &Ctx, txn: &DatabaseTransaction, ids: &BTreeSet<U
     if !ctx.can("media.view_any") || !ctx.can("media.view") {
         return Ok(false);
     }
-    let found = crate::services::public_media::images(txn, ids.iter().copied()).await?;
+    // Locked (shared) until the restore commits, in key order, as the panel's media check
+    // does: an image cannot be trashed or deleted between this check and the write.
+    let found = media::Entity::find()
+        .filter(media::Column::Id.is_in(ids.iter().copied()))
+        .filter(media::Column::DeletedAt.is_null())
+        .filter(media::Column::Mime.is_in(crate::services::public_media::IMAGE_MIMES))
+        .order_by_asc(media::Column::Id)
+        .lock_shared()
+        .all(txn)
+        .await?;
     if found.len() != ids.len() {
         return Ok(false);
     }
     let sees_all = ctx.can(rustcms::admin::media::VIEW_ALL) || ctx.can("media.manage_all");
     let me = content_sync::actor_id(ctx);
-    Ok(sees_all || found.values().all(|m| Some(m.owner_id) == me))
+    Ok(sees_all || found.iter().all(|m| Some(m.owner_id) == me))
 }
 
 #[cfg(test)]
