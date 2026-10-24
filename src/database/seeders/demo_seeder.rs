@@ -27,10 +27,9 @@ use serde_json::{Value, json};
 
 use crate::models::{author_profile, category, menu, menu_item, page, post, post_tag, tag};
 use crate::services::authors::{self, NewProfile};
+use crate::services::content::Kind;
 use crate::services::content_sync::{self, Change};
 use crate::services::menus::{self, Item};
-use crate::services::public_media::{self, Subject};
-use crate::services::search::{normalize, plain_text};
 use crate::services::slug::slugify;
 use crate::services::taxonomy;
 
@@ -506,8 +505,6 @@ async fn seed_posts(
             title: Set(title.into()),
             slug: Set(slug),
             excerpt: Set(Some(excerpt.into())),
-            search_text: Set(Some(search_text(title, excerpt, &body))),
-            reading_minutes: Set(reading_minutes(&body)),
             body: Set(Some(body)),
             category_id: Set(Some(id_of(categories, category_slug)?)),
             author_id: Set(users[author].id),
@@ -530,10 +527,8 @@ async fn seed_posts(
             .insert(txn)
             .await?;
         }
-        public_media::sync(txn, Subject::Post, made.id).await?;
-        // TODO(posts): record the `post.*` outbox event through the posts service once it exists
-        // (main has no content_sync function for posts yet), and take `search_text` and
-        // `reading_minutes` from it instead of the helpers below.
+        // Search text, reading time, public media, the first revision and the `post.created` event.
+        content_sync::content_changed(txn, Kind::Post, made.id, Change::Created, Some(users[author].id)).await?;
         audit.push(AuditEntry::new("created", "posts").key(made.id));
     }
     Ok(())
@@ -563,8 +558,6 @@ async fn seed_pages(
                     title: Set(title.into()),
                     slug: Set(slug.into()),
                     excerpt: Set(Some(excerpt.into())),
-                    search_text: Set(Some(search_text(title, excerpt, &body))),
-                    reading_minutes: Set(reading_minutes(&body)),
                     body: Set(Some(body)),
                     author_id: Set(author_id),
                     status: Set("published".into()),
@@ -575,8 +568,7 @@ async fn seed_pages(
                 }
                 .insert(txn)
                 .await?;
-                public_media::sync(txn, Subject::Page, made.id).await?;
-                // TODO(pages): the `page.*` outbox event, through the pages service once it exists.
+                content_sync::content_changed(txn, Kind::Page, made.id, Change::Created, Some(author_id)).await?;
                 audit.push(AuditEntry::new("created", "pages").key(made.id));
                 made.id
             }
@@ -653,17 +645,6 @@ async fn seed_menus(
         }
     }
     Ok(())
-}
-
-/// What the search matches (`services::search`): title, excerpt and body text, normalized.
-fn search_text(title: &str, excerpt: &str, body: &Value) -> String {
-    normalize(&format!("{title}\n{excerpt}\n{}", plain_text(body)))
-}
-
-/// Minutes to read the body at 200 words a minute, at least one.
-fn reading_minutes(body: &Value) -> i32 {
-    let words = plain_text(body).split_whitespace().count();
-    words.div_ceil(200).max(1) as i32
 }
 
 /// Tips under each post, by category.

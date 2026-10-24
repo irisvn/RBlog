@@ -7,6 +7,7 @@ use rustcms::async_trait;
 use rustcms::prelude::*;
 use rustcms::schedule::Schedule;
 
+use crate::jobs::publish_due::PublishDue;
 use crate::jobs::redispatch_content_events::RedispatchContentEvents;
 use crate::services::events::WebhookConfig;
 
@@ -18,6 +19,7 @@ impl ServiceProvider for AppServiceProvider {
         // `rustcms db:seed` runs this one (it calls the others).
         app.seeder(crate::database::seeders::DatabaseSeeder);
         app.seeder(crate::database::seeders::content_api_seeder::ContentApiSeeder);
+        app.seeder(crate::database::seeders::role_seeder::RoleSeeder);
         app.seeder(crate::database::seeders::demo_seeder::DemoSeeder);
         // rustcms:seeders
         app.job::<crate::jobs::deliver_content_event::DeliverContentEvent>();
@@ -28,6 +30,11 @@ impl ServiceProvider for AppServiceProvider {
             Schedule::every("content-events-redispatch", Duration::from_secs(60))
                 .job(|| RedispatchContentEvents {})
                 .without_overlapping(),
+        );
+        // Scheduled posts and pages that are due go live (`services::publishing::publish_due`), all of
+        // them, so a run after downtime catches up.
+        app.schedule(
+            Schedule::every("publish-due", Duration::from_secs(60)).job(|| PublishDue {}).without_overlapping(),
         );
         app.command(crate::console::media_move_disk::MediaMoveDisk);
         app.command(crate::console::content_sync_public_media::ContentSyncPublicMedia);

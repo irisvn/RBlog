@@ -170,8 +170,8 @@ Settings → Integrations, **at least once** (retried with backoff):
     is lowercase hex over the raw body bytes, so verify before parsing the JSON;
   - in Rust, `rblog::services::webhook::verify(secret, timestamp, event_id, body, signature)`
     is the reference check;
-- the body lists the **cache tags** to revalidate (`post:{id}`, `posts`, `category:{slug}`,
-  `tag:{slug}`, `author:{slug}`, `menu:{key}`, `settings`, `sitemap`) and the old and new paths:
+- the body lists the **cache tags** to revalidate (`post:{id}`, `posts`, `page:{id}`, `pages`,
+  `category:{slug}`, `tag:{slug}`, `author:{slug}`, `menu:{key}`, `settings`, `sitemap`) and the old and new paths:
 
   ```json
   {
@@ -225,6 +225,10 @@ the change (`src/services/content_sync.rs`). Its payload:
 - `paths.old`: paths that no longer show the content (an old slug, a deleted record);
   `paths.new`: the paths that show it now. Categories are `/categories/{slug}`, tags
   `/tags/{slug}` and authors `/authors/{slug}`; a menu has no path of its own (both lists empty).
+- For a post or page, `paths.new` is its path while it is public (published and due, not
+  trashed); `paths.old` holds the paths of the slugs it just left, and its own path once it is
+  not public (a draft, pending, scheduled, trashed or deleted one). Every write of a post or page
+  sends an event, drafts included: revalidating a page nobody sees is harmless.
 
 | Event kind | When | Tags |
 |---|---|---|
@@ -232,6 +236,8 @@ the change (`src/services/content_sync.rs`). Its payload:
 | `tag.created`, `tag.updated`, `tag.deleted` | a tag is written | `tag:{slug}` (and the old slug on a rename), `posts`, `sitemap` |
 | `author.created`, `author.updated`, `author.deleted` | an author profile is written (`subject.id` is the user's id) | `author:{slug}` (and the old slug on a rename), `posts`, `sitemap` |
 | `menu.created`, `menu.updated`, `menu.deleted` | a menu or one of its items is written (an item change is `menu.updated`) | `menu:{key}` |
+| `post.created`, `post.updated`, `post.published`, `post.unpublished`, `post.trashed`, `post.restored`, `post.deleted` | a post is written (its tags too), goes live (published now, or a scheduled post falls due), goes back to a draft, to the trash or back, or is deleted for good. Submitting and scheduling are `post.updated` | `post:{id}`, `posts`, `category:{slug}` and `tag:{slug}` of its category and tags and of those it just left, `author:{slug}` of its author, `menu:{key}` of menus linking to it, `sitemap` |
+| `page.created`, …, `page.deleted` | the same for a page | `page:{id}`, `pages`, `author:{slug}`, `menu:{key}`, `sitemap` |
 
 Keep a fallback time-based revalidation (for example 10 minutes) in case the webhook stays
 unreachable.

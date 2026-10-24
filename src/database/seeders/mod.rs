@@ -7,6 +7,7 @@ use rustcms::{AppState, async_trait};
 
 pub mod content_api_seeder;
 pub mod demo_seeder;
+pub mod role_seeder;
 // rustcms:seeder-mods
 
 pub struct DatabaseSeeder;
@@ -22,6 +23,7 @@ impl Seeder for DatabaseSeeder {
             state,
             &[
                 &content_api_seeder::ContentApiSeeder,
+                &role_seeder::RoleSeeder,
                 // Not `demo_seeder::DemoSeeder`: demo content runs only on request
                 // (`rustcms db:seed --class demo`).
                 // rustcms:seeder-calls

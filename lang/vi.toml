@@ -138,3 +138,96 @@
 "Scheduled" = "Đã lên lịch"
 "Posts published per week" = "Bài đăng mỗi tuần"
 "Recently updated posts" = "Bài cập nhật gần đây"
+
+# Posts and pages (admin/resources/{post,page}_resource.rs, content.rs) and their revisions.
+"Posts" = "Bài viết"
+"Pages" = "Trang"
+"Excerpt" = "Tóm tắt"
+"A short summary for lists and search results" = "Một đoạn tóm tắt ngắn cho danh sách và kết quả tìm kiếm"
+"Left empty: made from the title" = "Để trống: tạo từ tiêu đề"
+"Cover image" = "Ảnh bìa"
+"Featured" = "Nổi bật"
+"Shown first where the public site highlights posts" = "Hiện trước ở những chỗ trang công khai làm nổi bật bài viết"
+"SEO" = "SEO"
+"For search engines. Left empty: the title" = "Dành cho công cụ tìm kiếm. Để trống: dùng tiêu đề"
+"For search engines. Left empty: the excerpt" = "Dành cho công cụ tìm kiếm. Để trống: dùng tóm tắt"
+"Canonical URL" = "URL gốc (canonical)"
+"Only when the post first appeared elsewhere" = "Chỉ điền khi bài đã đăng lần đầu ở nơi khác"
+"Only when the page first appeared elsewhere" = "Chỉ điền khi trang đã đăng lần đầu ở nơi khác"
+"Share image" = "Ảnh chia sẻ"
+"Shown when the post is shared. Left empty: the cover" = "Hiện khi bài được chia sẻ. Để trống: dùng ảnh bìa"
+"Shown when the page is shared. Left empty: the cover" = "Hiện khi trang được chia sẻ. Để trống: dùng ảnh bìa"
+"Publishing" = "Xuất bản"
+"Publish date" = "Ngày đăng"
+"Times are in UTC" = "Giờ tính theo UTC"
+"Changed with Submit for review, Publish, Schedule and Unpublish" = "Đổi bằng các thao tác Gửi duyệt, Đăng, Hẹn giờ và Gỡ đăng"
+"Revisions" = "Lịch sử sửa"
+"Post revision" = "Phiên bản bài viết"
+"Post revisions" = "Phiên bản bài viết"
+"Page revision" = "Phiên bản trang"
+"Page revisions" = "Phiên bản trang"
+"Saved at" = "Lưu lúc"
+"Saved by" = "Người lưu"
+"Preview" = "Xem trước"
+
+# Status words (docs/ui-guidelines.md §4).
+"Draft" = "Nháp"
+"Published" = "Đã đăng"
+
+# Workflow actions (admin/resources/content.rs, services::publishing, services::revisions).
+"Submit for review" = "Gửi duyệt"
+"Publish" = "Đăng"
+"Publish now? It goes live on the public site." = "Đăng ngay? Bài sẽ hiện trên trang công khai."
+"Schedule…" = "Hẹn giờ…"
+"Publish at" = "Đăng lúc"
+"Unpublish" = "Gỡ đăng"
+"Unpublish? It is removed from the public site and goes back to drafts." = "Gỡ đăng? Bài sẽ bị gỡ khỏi trang công khai và trở về bản nháp."
+"Restore this version" = "Khôi phục phiên bản này"
+"Restore this version? The post's content is replaced by it; its status does not change." = "Khôi phục phiên bản này? Nội dung bài viết sẽ được thay bằng phiên bản này; trạng thái giữ nguyên."
+"Restore this version? The page's content is replaced by it; its status does not change." = "Khôi phục phiên bản này? Nội dung trang sẽ được thay bằng phiên bản này; trạng thái giữ nguyên."
+# Their messages (`ctx.t`): `lang:missing` does not list them.
+"This change does not apply to its current status" = "Thao tác này không áp dụng cho trạng thái hiện tại"
+"must be in the future" = "phải là một thời điểm trong tương lai"
+"must be an http or https address" = "phải là địa chỉ http hoặc https"
+"This version cannot be restored: its body is no longer valid" = "Không khôi phục được phiên bản này: nội dung của nó không còn hợp lệ"
+"This version cannot be restored: one of its images is no longer available to you" = "Không khôi phục được phiên bản này: một ảnh trong đó không còn dùng được với bạn"
+"This version cannot be restored: its category or one of its tags is not available to you" = "Không khôi phục được phiên bản này: danh mục hoặc một thẻ của nó không còn dùng được với bạn"
+
+# Roles and permissions (database/seeders/role_seeder.rs, providers/auth_service_provider.rs).
+"Editor" = "Biên tập viên"
+"Contributor" = "Cộng tác viên"
+"See every post" = "Xem mọi bài viết"
+"Every author's posts and their history, not only one's own" = "Bài viết và lịch sử sửa của mọi tác giả, không chỉ của mình"
+"Edit others' posts" = "Sửa bài của người khác"
+"Edit, tag, publish and delete posts of other authors (with the matching permission)" = "Sửa, gắn thẻ, đăng và xoá bài của tác giả khác (khi có quyền tương ứng)"
+"Publish posts" = "Đăng bài viết"
+"Publish and schedule posts; without it, posts can only be edited while draft or pending" = "Đăng và hẹn giờ bài viết; không có quyền này thì chỉ sửa được bài còn nháp hoặc chờ duyệt"
+"Unpublish posts" = "Gỡ đăng bài viết"
+"Take published or scheduled posts back to drafts" = "Đưa bài đã đăng hoặc đã hẹn giờ trở về bản nháp"
+"Submit posts for review" = "Gửi duyệt bài viết"
+"Move a draft to pending review" = "Chuyển bản nháp sang chờ duyệt"
+"Publish pages" = "Đăng trang"
+"Publish and schedule pages; without it, pages can only be edited while draft or pending" = "Đăng và hẹn giờ trang; không có quyền này thì chỉ sửa được trang còn nháp hoặc chờ duyệt"
+"Unpublish pages" = "Gỡ đăng trang"
+"Take published or scheduled pages back to drafts" = "Đưa trang đã đăng hoặc đã hẹn giờ trở về bản nháp"
+"Submit pages for review" = "Gửi duyệt trang"
+"Restore post revisions" = "Khôi phục phiên bản bài viết"
+"Put an earlier version back, on posts one may edit" = "Đưa một phiên bản cũ trở lại, trên những bài mình được sửa"
+"Restore page revisions" = "Khôi phục phiên bản trang"
+"Put an earlier version back, on pages one may edit" = "Đưa một phiên bản cũ trở lại, trên những trang mình được sửa"
+"Every post and page, publishing, categories, tags, menus and media" = "Mọi bài viết và trang, xuất bản, danh mục, thẻ, menu và media"
+"Writes and publishes their own posts, uploads media" = "Viết và tự đăng bài của mình, tải media lên"
+"Writes their own drafts and submits them for review" = "Viết bản nháp của mình và gửi duyệt"
+
+# Per resource (tables come last): the body is not "Nội dung", the name of its form tab.
+[posts]
+"Body" = "Thân bài"
+
+[pages]
+"Body" = "Thân bài"
+
+[post_revisions]
+"Body" = "Thân bài"
+
+[page_revisions]
+"Body" = "Thân bài"

@@ -1,0 +1,6 @@
+/* The preview slot of posts and pages (content.tsx): theme tokens and the type scale only. */
+
+.rblog-preview { display: flex; flex-direction: column; gap: 0.75rem; min-width: 0; font-size: 0.875rem; line-height: 1.25rem; }
+.rblog-preview-text { margin: 0; color: var(--muted-foreground); }
+.rblog-preview-link { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0.25rem 0.5rem; min-width: 0; }
+.rblog-preview-expiry { grid-column: 1 / -1; margin: 0; font-size: 0.75rem; line-height: 1rem; color: var(--muted-foreground); }

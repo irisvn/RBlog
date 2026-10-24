@@ -33,8 +33,31 @@ first. It creates:
 - 2 pages (Giới thiệu, Liên hệ), and the `primary` and `footer` menus linking categories and pages.
 
 Its changes are recorded in the audit log and the outbox (`docs/api.md`, "Webhook"): authors,
-categories, tags and menus. Posts and pages get their `public_media` rows, but no outbox event yet
-(no post or page event exists on this branch).
+categories, tags, menus, posts and pages. Posts and pages go through `content_sync::content_changed`
+like every other write: search text, reading time, `public_media` rows, a first revision and the
+`post.created` / `page.created` event.
+
+## Roles and publishing
+
+`rustcms db:seed` creates four roles (`src/database/seeders/role_seeder.rs`, through `RbacService`;
+an existing role is left as it is), and the Roles page offers the last three as presets:
+
+| | Administrator | Editor | Author | Contributor |
+|---|---|---|---|---|
+| See every post (`posts.view_all`), edit others' (`posts.edit_others`) | ✓ | ✓ | own only | own only |
+| Write and tag posts | ✓ | ✓ | own | own, while draft or pending |
+| Publish, schedule, unpublish (`posts.publish`, `posts.unpublish`) | ✓ | ✓ | own | – |
+| Trash and restore | ✓ | ✓ | own | own drafts |
+| Pages, categories, tags, menus | ✓ | ✓ | – | – |
+| Upload media / see every file (`media.view_all`) | ✓ / ✓ | ✓ / ✓ | ✓ / ✓ | – / ✓ |
+| Settings, integrations, users, roles | ✓ | – | – | – |
+
+The rules on a record live in `src/policies/content.rs`. A post's `status`, `published_at` and
+`author_id` are set by the server only: the workflow actions (Submit for review, Publish, Schedule…,
+Unpublish) go through `src/services/publishing.rs`, and the `publish-due` schedule (every minute)
+publishes every scheduled post and page that is due, catching up after downtime. Every write ends
+in `src/services/content_sync.rs`; revisions (`src/services/revisions.rs`, 30 per post or page)
+are listed and restored on the post's page.
 
 ### Test and CI times
 
@@ -57,7 +80,7 @@ categories, tags and menus. Posts and pages get their `public_media` rows, but n
 | `src/jobs/` | background jobs | `make:job` |
 | `src/settings/` | settings stored in the database | `make:settings` |
 | `src/console/` | console commands | `make:command` |
-| `src/admin/` | `resources/` (one per model), `pages/` (settings pages) | `make:resource`, `make:settings` |
+| `src/admin/` | `resources/` (one per model), `pages/` (settings pages), `slots/` (beside records), `dashboard.rs` | `make:resource`, `make:settings` |
 | `src/database/` | `migrations/`, `seeders/`, `factories/` | `make:migration`, `make:seeder`, `make:factory` |
 | `tests/feature/` | tests through HTTP, on MySQL 8.4 only | `make:test` |
 | `config/`, `lang/`, `storage/` | configuration, translations, uploaded files | |

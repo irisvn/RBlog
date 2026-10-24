@@ -26,3 +26,4 @@ pub async fn holding(app: &TestApp, role: &str, permissions: &[&str]) -> user::M
 }
 
 pub mod content;
+pub mod posts;

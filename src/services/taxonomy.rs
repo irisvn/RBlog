@@ -12,7 +12,7 @@ use rustcms::{AppResult, ValidationErrors};
 use sea_orm::prelude::DateTimeUtc;
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseTransaction, EntityTrait, QueryFilter, QuerySelect, Set};
 
-use crate::models::{author_profile, category, slug_history, tag};
+use crate::models::{author_profile, category, page, post, slug_history, tag};
 use crate::services::content_sync::{self, Change};
 use crate::services::slug::{Slugged, slugify, unique_slug};
 
@@ -37,6 +37,17 @@ impl Taxonomy for tag::Entity {
 
 impl Taxonomy for author_profile::Entity {
     const SUBJECT: &'static str = "author";
+}
+
+// Posts and pages make and keep their slugs the same way ([`slug_for_create`],
+// [`slug_for_update`]); their events come from `content_sync::content_changed`, never from
+// [`saved`] or [`deleted`].
+impl Taxonomy for post::Entity {
+    const SUBJECT: &'static str = "post";
+}
+
+impl Taxonomy for page::Entity {
+    const SUBJECT: &'static str = "page";
 }
 
 /// The slug of a new record: `typed` made a slug (a 422 on `slug` when nothing is left of it),
@@ -163,6 +174,7 @@ async fn event<E: Taxonomy>(
     match E::SUBJECT {
         "category" => content_sync::category_changed(txn, change, id, slug, old).await,
         "author" => content_sync::author_changed(txn, change, id, slug, old).await,
-        _ => content_sync::tag_changed(txn, change, id, slug, old).await,
+        "tag" => content_sync::tag_changed(txn, change, id, slug, old).await,
+        other => Err(rustcms::AppError::internal(format!("no taxonomy events for `{other}`"))),
     }
 }

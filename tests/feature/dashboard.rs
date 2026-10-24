@@ -1,5 +1,5 @@
 //! Dashboard widgets (`admin::dashboard`) on the demo data: their numbers, and who sees them.
-//! The post widgets wait for the `posts` resource (see `admin::dashboard::with_post_widgets`).
+//! The post widgets: tests/feature/posts.rs.
 
 use rblog::database::migrations::Migrator;
 use rblog::database::seeders::demo_seeder::DemoSeeder;
@@ -56,5 +56,5 @@ db_test!(a_widget_needs_its_permission_and_its_resource, migrate = Migrator, |db
     assert_eq!(listed(&both).await, 1);
     both.get(&data).await.assert_status(StatusCode::OK).assert_json("/value", json!("3"));
     // An unknown widget.
-    both.get(&app.admin_api("dashboard/widgets/published_posts")).await.assert_status(StatusCode::NOT_FOUND);
+    both.get(&app.admin_api("dashboard/widgets/nope")).await.assert_status(StatusCode::NOT_FOUND);
 });

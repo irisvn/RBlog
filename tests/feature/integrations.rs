@@ -177,6 +177,18 @@ db_test!(only_integrations_permissions_give_access, migrate = Migrator, |db: Tes
                 .expect("viewer", &viewer, StatusCode::FORBIDDEN)
                 .expect("manager", &manager, StatusCode::NOT_FOUND)
                 .expect("super admin", &admin, StatusCode::NOT_FOUND),
+            // Preview links (tests/feature/posts.rs covers them in full): `posts.view` /
+            // `pages.view`, then the record; allowed callers get 404, no such post or page.
+            Case::new(Method::POST, "/previews/posts/1")
+                .expect("anonymous", &anonymous, StatusCode::UNAUTHORIZED)
+                .expect("nobody", &nobody, StatusCode::FORBIDDEN)
+                .expect("viewer", &viewer, StatusCode::FORBIDDEN)
+                .expect("super admin", &admin, StatusCode::NOT_FOUND),
+            Case::new(Method::POST, "/previews/pages/1")
+                .expect("anonymous", &anonymous, StatusCode::UNAUTHORIZED)
+                .expect("nobody", &nobody, StatusCode::FORBIDDEN)
+                .expect("manager", &manager, StatusCode::FORBIDDEN)
+                .expect("super admin", &admin, StatusCode::NOT_FOUND),
         ],
     )
     .await;

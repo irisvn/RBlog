@@ -14,6 +14,8 @@
 //   RBLOG_SHOT_THEMES    light,dark
 //   RBLOG_SHOT_LOCALES   en,vi
 //   RBLOG_SHOT_SCALE     the device pixel ratio (1)
+//   RBLOG_SHOT_POST      the post whose page and edit form are shot (1), and its title
+//   RBLOG_SHOT_POST_TITLE (Ba ngày ở Đà Nẵng): the list row whose Schedule dialog is shot
 //
 // The Content API shots make a key named "Shot key" and revoke it again by its id at the end,
 // even when a step fails (a failed revocation fails the run), so no key it made stays usable. Keep the shots out of the repository (the default is /tmp).
@@ -105,7 +107,60 @@ const SEQUENCES = [
       if (status !== 204 && status !== 404) throw new Error(`revoking key ${state.keyId}: HTTP ${status}`);
     },
   },
+  // Posts: the list and the Schedule dialog of the post RBLOG_SHOT_POST (1, titled
+  // RBLOG_SHOT_POST_TITLE) from its row, then its page (preview slot, revisions) and the tabs of
+  // its edit form. Nothing is saved: the dialog is closed with Escape.
+  {
+    path: "/r/posts",
+    steps: [
+      ["posts-list", async () => {}, true],
+      ["post-schedule", async (page) => {
+        const row = page.getByRole("row").filter({ hasText: env("RBLOG_SHOT_POST_TITLE", "Ba ngày ở Đà Nẵng") }).first();
+        await openAction(page, row, /^(Schedule…|Hẹn giờ…)$/);
+        await dialog(page).waitFor({ timeout: 5000 });
+        await settle(page);
+      }],
+    ],
+  },
+  {
+    path: `/r/posts/records/${env("RBLOG_SHOT_POST", "1")}`,
+    steps: [
+      ["post-view", async () => {}, true],
+      ["post-preview", async (page) => {
+        const button = page.getByRole("button", { name: /^(Get preview link|Lấy link xem trước)$/ });
+        await button.scrollIntoViewIfNeeded();
+        await button.click();
+        await settle(page, 1000);
+      }],
+    ],
+  },
+  {
+    path: `/r/posts/records/${env("RBLOG_SHOT_POST", "1")}/edit`,
+    steps: [
+      ["post-edit-content", async () => {}, true],
+      ["post-edit-seo", async (page) => {
+        await page.getByRole("tab", { name: /^SEO$/ }).click();
+        await settle(page);
+      }, true],
+      ["post-edit-publishing", async (page) => {
+        await page.getByRole("tab", { name: /^(Publishing|Xuất bản)$/ }).click();
+        await settle(page);
+      }, true],
+    ],
+  },
 ];
+
+/** Clicks the action `name` of `row`, opening its menu first when it is not a button. */
+async function openAction(page, row, name) {
+  const direct = row.getByRole("button", { name });
+  if (await direct.count()) {
+    await direct.first().click();
+    return;
+  }
+  await row.getByRole("button").last().click();
+  await settle(page, 300);
+  await page.getByRole("menuitem", { name }).click();
+}
 const wanted = list("RBLOG_SHOT_SHOTS", SEQUENCES.flatMap((s) => s.steps.map(([name]) => name)).join(","));
 
 fs.mkdirSync(out, { recursive: true });
@@ -131,6 +186,8 @@ for (const locale of locales) {
     for (const width of widths) {
       await page.setViewportSize({ width, height: 900 });
       for (const sequence of SEQUENCES) {
+        // A sequence none of whose shots is wanted does not run (its steps may write).
+        if (!sequence.steps.some(([name]) => wanted.includes(name))) continue;
         // What the steps made (`keyId`), for the cleanup.
         const state = {};
         try {

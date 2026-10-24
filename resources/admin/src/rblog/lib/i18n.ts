@@ -21,6 +21,24 @@ window.rustcms?.registerTranslations?.("vi", {
   // Status words (lib/status.ts)
   Active: "Đang dùng",
   Expired: "Đã hết hạn",
+  Published: "Đã đăng",
+  "Pending review": "Chờ duyệt",
+  Scheduled: "Đã lên lịch",
+  Draft: "Nháp",
+
+  // Preview of a post or page (content.tsx)
+  "See it on the public site as readers will, before it goes live. A link works for one hour.":
+    "Xem trên trang công khai đúng như người đọc sẽ thấy, trước khi đăng. Mỗi link dùng được một giờ.",
+  "Set the public site URL in Settings → General to preview.":
+    "Hãy đặt URL trang công khai trong Cài đặt → Chung để xem trước.",
+  "Get preview link": "Lấy link xem trước",
+  "New preview link": "Lấy link mới",
+  "Making link…": "Đang tạo link…",
+  "Copy link": "Copy link",
+  "Link copied": "Đã copy link",
+  "Could not copy. Select the link and copy it.": "Không copy được. Hãy chọn link rồi copy.",
+  "Works until {time}": "Dùng được đến {time}",
+  "This record can no longer be previewed.": "Không còn xem trước được mục này.",
 
   // Content API (content-api.tsx)
   Integrations: "Tích hợp",

@@ -68,6 +68,79 @@ pub async fn issue<C: ConnectionTrait>(txn: &C, subject: PreviewSubject, created
     Ok(token)
 }
 
+/// A preview link: the public site's preview route with a fresh token.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PreviewLink {
+    pub url: String,
+    pub expires_at: DateTimeUtc,
+}
+
+/// A preview link for post or page `key`, made by the user of `ctx`:
+///
+/// - the record is read as the panel reads it for this user (`Ctx::record`: the resource's
+///   admission, scope and `view` policy; 403 or 404 otherwise, a trashed one is 404);
+/// - `None` while Settings → General has no public site URL (no token is made);
+/// - otherwise a token ([`issue`], audited), and
+///   `{frontend_url}{preview_path}?token={token}` (Settings → Integrations' preview path).
+pub async fn issue_link(
+    app: &rustcms::AppState,
+    ctx: &rustcms::admin::Ctx,
+    kind: crate::services::content::Kind,
+    key: &str,
+) -> rustcms::AppResult<Option<PreviewLink>> {
+    use crate::services::content::Kind;
+    use crate::settings::general_settings::GeneralSettings;
+    use crate::settings::integration_settings::IntegrationSettings;
+
+    ctx.record(kind.resource(), key).await?;
+    let id: i64 = key.parse().map_err(|_| rustcms::AppError::NotFound)?;
+    let general = rustcms::settings::get::<GeneralSettings>(app).await?;
+    let Some(frontend) = general.frontend_url() else { return Ok(None) };
+    let integrations = rustcms::settings::get::<IntegrationSettings>(app).await?;
+    let me: i64 = ctx.principal.id.parse().map_err(|_| rustcms::AppError::Forbidden)?;
+    let subject = match kind {
+        Kind::Post => PreviewSubject::Post(id),
+        Kind::Page => PreviewSubject::Page(id),
+    };
+    let txn = rustcms::db::begin_write(app.db()).await?;
+    let token = issue(&txn, subject, me).await?;
+    rustcms::audit::record(
+        &txn,
+        &ctx.audit_context,
+        rustcms::audit::AuditEntry::new("preview_link.created", kind.resource()).key(id),
+    )
+    .await?;
+    txn.commit().await?;
+    Ok(Some(PreviewLink {
+        url: preview_url(frontend, &integrations.preview_path, &token),
+        expires_at: DateTimeUtc::from(SystemTime::now() + LIFETIME),
+    }))
+}
+
+/// `{frontend}{path}` with `token=` added to its query: after a query the path already has
+/// (`/preview?mode=draft` → `…&token=`), before its fragment (`/preview#top` → `?token=…#top`).
+/// The token is alphanumeric: it needs no escaping.
+pub fn preview_url(frontend: &str, path: &str, token: &str) -> String {
+    // The site's address names a site: a query or fragment it carries would swallow the route.
+    let frontend = frontend.split(['?', '#']).next().unwrap_or_default().trim_end_matches('/');
+    let (path, fragment) = match path.split_once('#') {
+        Some((path, fragment)) => (path, Some(fragment)),
+        None => (path, None),
+    };
+    let joiner = match path.split_once('?') {
+        Some((_, "")) => "",
+        Some((_, query)) if query.ends_with('&') => "",
+        Some(_) => "&",
+        None => "?",
+    };
+    let mut url = format!("{frontend}{path}{joiner}token={token}");
+    if let Some(fragment) = fragment {
+        url.push('#');
+        url.push_str(fragment);
+    }
+    url
+}
+
 /// Revokes the token `token_id` (no-op when it is already revoked or does not exist).
 pub async fn revoke<C: ConnectionTrait>(txn: &C, token_id: i64) -> Result<(), DbErr> {
     preview_token::Entity::update_many()
@@ -106,4 +179,31 @@ pub async fn post<C: ConnectionTrait>(db: &C, id: i64) -> Result<Option<post::Mo
 /// The page a preview shows, unless it is trashed.
 pub async fn page<C: ConnectionTrait>(db: &C, id: i64) -> Result<Option<page::Model>, DbErr> {
     page::Entity::find_by_id(id).filter(page::Column::DeletedAt.is_null()).one(db).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::preview_url;
+
+    #[test]
+    fn the_token_joins_the_query_before_the_fragment() {
+        let site = "https://blog.example.com";
+        assert_eq!(preview_url(site, "/preview", "T"), "https://blog.example.com/preview?token=T");
+        assert_eq!(
+            preview_url(site, "/preview?mode=draft", "T"),
+            "https://blog.example.com/preview?mode=draft&token=T"
+        );
+        assert_eq!(preview_url(site, "/preview?", "T"), "https://blog.example.com/preview?token=T");
+        assert_eq!(preview_url(site, "/preview?a=1&", "T"), "https://blog.example.com/preview?a=1&token=T");
+        assert_eq!(preview_url(site, "/preview#top", "T"), "https://blog.example.com/preview?token=T#top");
+        assert_eq!(preview_url(site, "/p?x=1#top", "T"), "https://blog.example.com/p?x=1&token=T#top");
+        assert_eq!(
+            preview_url("https://blog.example.com/#top", "/preview", "T"),
+            "https://blog.example.com/preview?token=T"
+        );
+        assert_eq!(
+            preview_url("https://blog.example.com/?a=1", "/preview", "T"),
+            "https://blog.example.com/preview?token=T"
+        );
+    }
 }

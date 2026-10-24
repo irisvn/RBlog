@@ -37,9 +37,16 @@ pub fn provider() -> AdminProvider {
         .resource::<crate::admin::resources::author_profile_resource::AuthorProfileResource>()
         // The target of `belongs_to("users")` (read only, no navigation entry).
         .resource::<crate::admin::resources::user_resource::UserResource>()
+        // The target of posts' and pages' `author_id`: names only (read only, no navigation entry).
+        .resource::<crate::admin::resources::post_author_resource::PostAuthorResource>()
+        // Posts and pages come first in the navigation (`sort`); revisions are shown on their pages.
+        .resource::<crate::admin::resources::post_resource::PostResource>()
+        .resource::<crate::admin::resources::page_resource::PageResource>()
+        .resource::<crate::admin::resources::post_revision_resource::PostRevisionResource>()
+        .resource::<crate::admin::resources::page_revision_resource::PageRevisionResource>()
         // rustcms:resources
         // Widgets above the resource cards (`admin::dashboard`).
-        .dashboard(crate::admin::dashboard::dashboard())
+        .dashboard(crate::admin::dashboard::with_post_widgets(crate::admin::dashboard::dashboard()))
         // Integrations: the Content API keys of the public site (a React page on `routes::admin`).
         .page::<crate::admin::pages::content_api_page::ContentApiPage>()
         // rustcms:pages
@@ -49,5 +56,14 @@ pub fn provider() -> AdminProvider {
             Requires { react: "19.3", react_query: "5.104", ui: 2 },
         )
         .extension_style("content-api", include_str!("../../resources/admin/css/rblog/content-api.css"))
+        // Posts and pages: the status cell of their lists and the preview slot of their pages.
+        .slot::<crate::admin::slots::preview_slot::PostPreviewSlot>()
+        .slot::<crate::admin::slots::preview_slot::PagePreviewSlot>()
+        .extension_script_v2(
+            "content",
+            include_str!("../../resources/admin/js/rblog/content.js"),
+            Requires { react: "19.3", react_query: "5.104", ui: 2 },
+        )
+        .extension_style("content", include_str!("../../resources/admin/css/rblog/content.css"))
     // rustcms:extensions
 }

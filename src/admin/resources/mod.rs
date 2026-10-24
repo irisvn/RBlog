@@ -10,8 +10,14 @@ use crate::services::taxonomy::{self, Taxonomy};
 
 pub mod author_profile_resource;
 pub mod category_resource;
+pub mod content;
 pub mod menu_item_resource;
 pub mod menu_resource;
+pub mod page_resource;
+pub mod page_revision_resource;
+pub mod post_author_resource;
+pub mod post_resource;
+pub mod post_revision_resource;
 pub mod tag_resource;
 pub mod user_resource;
 // rustcms:resource-mods

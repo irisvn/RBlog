@@ -9,7 +9,9 @@ pub struct Model {
     pub post_id: i64,
     #[sea_orm(primary_key, auto_increment = false)]
     pub tag_id: i64,
-    /// The tag's place in the post's list (lowest first).
+    /// The tag's place in the post's list (lowest first). Links made from the post's form take the
+    /// default (0: then by tag id).
+    #[sea_orm(default_value = 0)]
     pub position: i32,
 }
 
