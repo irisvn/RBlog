@@ -221,7 +221,8 @@ document.
   - For UI changes, also run `npm run typecheck && npm run build` in `resources/admin`, then the
     checks in §2.
 - **CI** (`.github/workflows/ci.yml`):
-  - Two parallel jobs, `lint` and `test`.
+  - Two parallel jobs, `lint` and `test`. The admin bundle is checked by a separate workflow,
+    `.github/workflows/admin.yml`, when `resources/admin` changes.
   - It skips documentation-only changes, and a newer push cancels the older run.
   - Keep these properties, and keep CI's MySQL flags identical to `mysql-test`.
 - **Releases** (`.github/workflows/release.yml`) run only on a `vX.Y.Z` tag, which must match

@@ -65,6 +65,10 @@
   returns the stored document, version 1 or 2 (docs/api.md, "Rich text").
 - Search and reading time count table cells, callouts and image captions; images nested in
   callouts are public exactly like the others.
+- Once a version 2 body is saved, do not roll the binary back below RustCMS 0.10: older versions
+  refuse those bodies.
+
+### The first version (RustCMS 0.9.0)
 
 The first complete version of RBlog: the admin back office of a blog and its read-only Content API
 for a separate Nuxt/Next site.
@@ -87,7 +91,9 @@ for a separate Nuxt/Next site.
 - **Media** on a local disk or S3 (AWS, R2, MinIO), and `media:move-disk` to switch an existing
   site.
 - **Operations**: MySQL 8.4 only; tests on an in-memory MySQL; CI in parallel; releases build Linux
-  binaries and a Docker image from a `vX.Y.Z` tag. RustCMS-Core v0.10.0.
+  binaries and a Docker image from a `vX.Y.Z` tag. Started on RustCMS-Core v0.8.2 and built on
+  v0.9.0 (trash, restore, relation and settings hooks, date-time action fields, `media.view_all`,
+  several tags chosen in the post form); the sections above upgrade it to v0.10.2.
 - **Checks**: `scripts/ui-shots.mjs` screenshots every admin screen (1440, 768 and 390 px, light
   and dark, English and Vietnamese); `scripts/e2e-smoke.mjs` runs the publishing path end to end
   (roles, preview, Content API, signed webhook).

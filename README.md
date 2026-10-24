@@ -29,18 +29,22 @@ first. It creates:
   roles on the Users page to sign in as one;
 - 4 categories (Du lịch, Ẩm thực, Công nghệ, Đời sống) and 8 tags;
 - 20 posts with a rich-text body: 9 published at different past dates, 3 scheduled, 3 pending
-  review, 3 drafts and 2 in the trash;
+  review, 3 drafts and 2 in the trash. The first five have a cover, a small image the seeder
+  draws into the media library (`src/database/seeders/demo_images.rs`) with a Vietnamese
+  alternative text;
 - 2 pages (Giới thiệu, Liên hệ), and the `primary` and `footer` menus linking categories and pages.
 
 Its changes are recorded in the audit log and the outbox (`docs/api.md`, "Webhook"): authors,
-categories, tags, menus, posts and pages. Posts and pages go through `content_sync::content_changed`
-like every other write: search text, reading time, `public_media` rows, a first revision and the
-`post.created` / `page.created` event.
+categories, tags, menus, posts and pages (the cover images in the audit log only). Posts and
+pages go through `content_sync::content_changed` like every other write: search text, reading
+time, `public_media` rows, a first revision and the `post.created` / `page.created` event.
 
 ## Roles and publishing
 
 `rustcms db:seed` creates four roles (`src/database/seeders/role_seeder.rs`, through `RbacService`;
-an existing role is left as it is), and the Roles page offers the last three as presets:
+an existing role is left as it is), and the Roles page offers the last three as presets. It also
+creates the Content API's system user `frontend@rblog.local` and its API role `content-reader`
+(`src/database/seeders/content_api_seeder.rs`).
 
 | | Administrator | Editor | Author | Contributor |
 |---|---|---|---|---|
@@ -48,16 +52,21 @@ an existing role is left as it is), and the Roles page offers the last three as 
 | Write and tag posts | ✓ | ✓ | own | own, while draft or pending |
 | Publish, schedule, unpublish (`posts.publish`, `posts.unpublish`) | ✓ | ✓ | own | – |
 | Trash and restore | ✓ | ✓ | own | own drafts |
-| Pages, categories, tags, menus | ✓ | ✓ | – | – |
+| Delete for good (`posts.force_delete`) | ✓ | ✓ | own | – |
+| See and restore revisions | ✓ | ✓ | own posts' | own posts' (restore while draft or pending) |
+| Pages and their revisions, categories, tags, menus | ✓ | ✓ | – | – |
+| Author profiles | ✓ | view | – | – |
 | Upload media / see every file (`media.view_all`) | ✓ / ✓ | ✓ / ✓ | ✓ / ✓ | – / ✓ |
 | Settings, integrations, users, roles | ✓ | – | – | – |
 
 The rules on a record live in `src/policies/content.rs`. A post's `status`, `published_at` and
 `author_id` are set by the server only: the workflow actions (Submit for review, Publish, Schedule…,
-Unpublish) go through `src/services/publishing.rs`, and the `publish-due` schedule (every minute)
+Unpublish), which each row and record page offers only where they apply to the status, go through
+`src/services/publishing.rs`, and the `publish-due` schedule (every minute)
 publishes every scheduled post and page that is due, catching up after downtime. Every write ends
 in `src/services/content_sync.rs`; revisions (`src/services/revisions.rs`, 30 per post or page)
-are listed and restored on the post's page.
+are listed on the post's or page's page, each row with its "Restore this version" action. The
+Preview action opens the public site's preview of a post or page in a new tab.
 
 ### End-to-end smoke test
 
@@ -91,6 +100,10 @@ deactivates both users.
 
 ### Test and CI times
 
+Measured when the tests moved to the in-memory MySQL and nextest ("After": 201 tests then). On
+2026-10-24 the gate runs **354 tests** (`scripts/check.sh`: 354 passed, 0 skipped), in about 21 s
+of tests once the build is warm; a cold build of a fresh checkout takes a few minutes more.
+
 | | Before | After |
 |---|---|---|
 | Local tests (warm build) | 3.1 s (`cargo test`, 2.3 s of tests) | 2.9 s for the whole gate (fmt, clippy, tests); tests 0.4 s |
@@ -101,8 +114,8 @@ deactivates both users.
 | Path | Holds | Generator |
 |---|---|---|
 | `src/bootstrap/` | `build()`: the app from its providers (`providers.rs` lists them) | |
-| `src/providers/` | auth (permissions), admin panel (resources, pages), app (jobs, seeders, commands) | |
-| `src/routes/api.rs` | every API route and its access | `make:api` |
+| `src/providers/` | auth (permissions, role presets), admin panel (theme, resources, pages, dashboard), app (jobs, schedules, seeders, commands) | |
+| `src/routes/` | every route and its access: `api.rs` (Content API, public media, preview), `admin.rs` (the panel's own JSON routes) | `make:api` |
 | `src/http/` | `controllers/`, `requests/`, `resources/` (JSON) | `make:api` |
 | `src/models/` | SeaORM entities and query scopes | `make:model` |
 | `src/services/` | business rules shared by the panel, the API, jobs and seeders | `make:service` |
@@ -114,4 +127,4 @@ deactivates both users.
 | `src/database/` | `migrations/`, `seeders/`, `factories/` | `make:migration`, `make:seeder`, `make:factory` |
 | `tests/feature/` | tests through HTTP, on MySQL 8.4 only | `make:test` |
 | `config/`, `lang/`, `storage/` | configuration, translations, uploaded files | |
-| `docs/` | `ui-guidelines.md` (the admin design system), `media.md` (disks, moving files), `api.md` (Content API) | |
+| `docs/` | `architecture.md` (modules, services, how a change reaches the public site), `api.md` (Content API, webhook), `frontend-integration.html` (building the Nuxt/Next site on it), `db-design.html` (tables and business rules), `media.md` (disks, moving files), `ui-guidelines.md` (the admin design system) | |
