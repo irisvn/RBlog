@@ -24,3 +24,6 @@ for a separate Nuxt/Next site.
   site.
 - **Operations**: MySQL 8.4 only; tests on an in-memory MySQL; CI in parallel; releases build Linux
   binaries and a Docker image from a `vX.Y.Z` tag. RustCMS-Core v0.9.0.
+- **Checks**: `scripts/ui-shots.mjs` screenshots every admin screen (1440, 768 and 390 px, light
+  and dark, English and Vietnamese); `scripts/e2e-smoke.mjs` runs the publishing path end to end
+  (roles, preview, Content API, signed webhook).

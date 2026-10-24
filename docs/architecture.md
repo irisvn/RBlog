@@ -21,7 +21,7 @@ travels from the admin to the public site. The database is described in docs/db-
 | `src/jobs/` | `publish_due`, `deliver_content_event`, `redispatch_content_events` |
 | `src/console/` | `media:move-disk`, `content:sync-public-media` |
 | `src/database/` | migrations, `RoleSeeder`, `ContentApiSeeder`, `DemoSeeder` |
-| `resources/admin/` | React pages (Content API keys, preview slot, status cell) and the shared components in `src/rblog/lib/` |
+| `resources/admin/` | React pages (Content API keys, preview slot, status and option-label cells) and the shared components in `src/rblog/lib/` |
 | `tests/feature/` | one test binary on MySQL (`db_test!`) |
 
 ## Services

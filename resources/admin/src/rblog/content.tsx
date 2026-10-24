@@ -1,6 +1,7 @@
 // Posts and pages: the status cell of their lists (`rblog/content-status`, docs/ui-guidelines.md
-// §4: a dot and a word) and the preview slot of their record pages (`rblog/content-preview`),
-// which asks `routes::admin` (`/previews/{posts|pages}/{id}`) for a link to the public site's
+// §4: a dot and a word), the option-label cell of other lists (`rblog/option-label`: a stored
+// value shown as its label, from the column's props) and the preview slot of their record pages
+// (`rblog/content-preview`), which asks `routes::admin` (`/previews/{posts|pages}/{id}`) for a link to the public site's
 // preview route. The server checks who may preview the record.
 import { useState } from "react";
 import { registerCell, registerSlot, useAdminMutation, type CellProps, type SlotProps } from "@rustcms/admin-sdk";
@@ -17,6 +18,14 @@ function StatusCell(props: CellProps<unknown, unknown, unknown>) {
   const [tone, word] = contentStatus(props.value);
   if (!word) return null;
   return <StatusBadge tone={tone} label={props.t(word)} />;
+}
+
+/** `props` maps each stored value to its English label; an unknown value is shown as itself. */
+function OptionLabelCell(props: CellProps<unknown, unknown, Record<string, string> | null>) {
+  if (props.value == null || props.value === "") return null;
+  const value = String(props.value);
+  const label = props.props?.[value];
+  return <>{label ? props.t(label) : value}</>;
 }
 
 type Link = { url: string | null; expires_at?: string };
@@ -85,4 +94,5 @@ function PreviewSlot(props: SlotProps<PreviewData, unknown>) {
 }
 
 registerCell("rblog/content-status", StatusCell);
+registerCell("rblog/option-label", OptionLabelCell);
 registerSlot("rblog/content-preview", PreviewSlot);

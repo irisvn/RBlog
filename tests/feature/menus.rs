@@ -235,3 +235,21 @@ db_test!(an_item_may_leave_out_its_position_and_tab, migrate = Migrator, |db: Te
     let item = menu_item::Entity::find_by_id(key(&created)).one(app.state().db()).await.unwrap().unwrap();
     assert_eq!((item.position, item.new_tab), (0, false));
 });
+
+db_test!(the_items_list_names_each_link_type, migrate = Migrator, |db: TestDb| async move {
+    let app = support::app(db).await;
+    let panel = admin(&app).await;
+    // The list shows the link type's label (the `rblog/option-label` cell), never the stored value.
+    let schema = panel.get(&app.admin_api("resources/menu_items/schema")).await.assert_status(StatusCode::OK).json();
+    let columns = schema["table"]["columns"].as_array().expect("table columns");
+    let kind = columns.iter().find(|c| c["name"] == "kind").expect("a kind column");
+    assert_eq!(kind["cell"], "rblog/option-label", "{kind}");
+    // Every type has a label, and the cell's catalog translates it.
+    let catalog = include_str!("../../resources/admin/src/rblog/lib/i18n.ts");
+    for value in menus::KINDS {
+        let label = kind["props"][value].as_str().unwrap_or_else(|| panic!("no label for {value}: {kind}"));
+        let key =
+            if label.chars().all(|c| c.is_ascii_alphanumeric()) { label.to_owned() } else { format!("\"{label}\"") };
+        assert!(catalog.contains(&format!("\n  {key}: ")), "{label} has no Vietnamese line in i18n.ts");
+    }
+});
