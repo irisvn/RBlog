@@ -161,7 +161,7 @@ footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--line)
           <li><strong>Chuỗi</strong>: collation <code>utf8mb4_0900_bin</code> trên cả database, mọi cột và mọi kết nối: so sánh phân biệt hoa thường, dấu và khoảng trắng cuối. RustCMS từ chối khởi động nếu sai.</li>
           <li><strong>Slug</strong>: chỉ chữ ASCII không dấu (<code>xin-chao-viet-nam</code>), duy nhất trong cả bảng, kể cả bản ghi trong thùng rác. Slug cũ được giữ trong <code>slug_history</code> để frontend chuyển hướng.</li>
           <li><strong>Xoá mềm</strong>: <code>posts</code> và <code>pages</code> có <code>deleted_at</code>. Phân loại, menu và tác giả xoá hẳn.</li>
-          <li><strong>Nội dung bài</strong>: cột <code>JSON</code> theo định dạng rich text của RustCMS (tối đa 256 KiB, 100 ảnh). Bản tìm kiếm không dấu nằm ở <code>search_text</code> (<code>MEDIUMTEXT</code>).</li>
+          <li><strong>Nội dung bài</strong>: cột <code>JSON</code> theo định dạng rich text của RustCMS (tối đa 256 KiB JSON, 10.000 phần tử, 100 ảnh; không có giá trị mặc định). Bản tìm kiếm không dấu nằm ở <code>search_text</code> (<code>MEDIUMTEXT</code>).</li>
           <li><strong>Tham chiếu media</strong>: các cột <code>*_media_id</code> không có khoá ngoại, vì media của RustCMS bị xoá mềm và RustCMS tự kiểm tra tham chiếu mỗi lần ghi.</li>
         </ul>
       </div>
@@ -235,7 +235,8 @@ erDiagram
     binary avatar_media_id }
   media { binary id PK
     varchar disk
-    varchar key }
+    varchar key
+    varchar alt }
   public_media { binary media_id PK
     varchar subject_type PK
     bigint subject_id PK }
@@ -252,7 +253,7 @@ erDiagram
         <span style="--dot: var(--fk)">Đường liền: khoá ngoại thật, kèm hành động khi xoá</span>
         <span style="--dot: var(--muted)">Đường chấm: tham chiếu không có khoá ngoại (media)</span>
       </div>
-      <p class="lede">Ba bảng dùng cặp <code>subject_type</code> + <code>subject_id</code> để trỏ tới nhiều loại nội dung và không có khoá ngoại: <code>slug_history</code>, <code>public_media</code>, <code>preview_tokens</code>. Bảng <code>content_events</code> đứng riêng, ghi lại mọi thay đổi.</p>
+      <p class="lede">Ba bảng dùng cặp <code>subject_type</code> + <code>subject_id</code> để trỏ tới nhiều loại nội dung và không có khoá ngoại: <code>slug_history</code>, <code>public_media</code> (cả ảnh của settings), <code>preview_tokens</code>. Bảng <code>content_events</code> đứng riêng, ghi lại mọi thay đổi.</p>
     </section>
 
     <section id="noi-dung" aria-labelledby="noi-dung-h">
@@ -261,7 +262,7 @@ erDiagram
       <article class="table-card" id="posts">
         <header>
           <div class="row"><h3>posts</h3><span class="tag">xoá mềm</span></div>
-          <p>Bài viết. Trạng thái và thời điểm đăng chỉ được đổi qua service đăng bài, không ghi trực tiếp từ form.</p>
+          <p>Bài viết. <code>status</code>, <code>published_at</code> và <code>author_id</code> do server đặt: form không ghi được. Trạng thái và thời điểm đăng chỉ đổi qua service đăng bài (<code>services::publishing</code>), tức các thao tác theo dòng và trên trang bài.</p>
         </header>
         <div class="scroll"><table>
           <thead><tr><th>Cột</th><th>Kiểu</th><th>Null</th><th>Ghi chú</th></tr></thead>
@@ -322,7 +323,7 @@ erDiagram
       <article class="table-card" id="revisions">
         <header>
           <div class="row"><h3>post_revisions · page_revisions</h3><span class="tag">lịch sử</span></div>
-          <p>Mỗi lần nội dung biên tập thay đổi thì lưu một bản. Giữ 30 bản gần nhất cho mỗi bài. Chỉ server tạo; khôi phục không đổi trạng thái đăng.</p>
+          <p>Mỗi lần nội dung biên tập thay đổi thì lưu một bản. Giữ 30 bản gần nhất cho mỗi bài hoặc trang (khi khôi phục một bản cũ hơn, bản đó được giữ thêm). Chỉ server tạo. "Khôi phục phiên bản này" là thao tác của từng dòng trong bảng Revisions: ghi lại nội dung, không đổi trạng thái, slug hay ngày đăng, và tạo một bản mới nếu nội dung khác bản mới nhất.</p>
         </header>
         <div class="scroll"><table>
           <thead><tr><th>Cột</th><th>Kiểu</th><th>Null</th><th>Ghi chú</th></tr></thead>
@@ -338,7 +339,7 @@ erDiagram
             <tr><td class="col">created_at</td><td class="type">datetime(6)</td><td class="null">không</td><td class="note"></td></tr>
           </tbody>
         </table></div>
-        <div class="keys"><div><b>Chỉ mục:</b> (post_id, created_at, id) để liệt kê và dọn bản cũ · author_id</div></div>
+        <div class="keys"><div><b>Chỉ mục:</b> (post_id, created_at, id) hoặc (page_id, created_at, id) để liệt kê và dọn bản cũ · author_id</div></div>
       </article>
     </section>
 
@@ -362,7 +363,7 @@ erDiagram
 
       <article class="table-card" id="tags">
         <header><div class="row"><h3>tags</h3><span class="tag">xoá hẳn</span></div><p>Thẻ. Cùng cột với <code>categories</code>, không có các trường SEO. Xoá thẻ thì gỡ khỏi mọi bài (CASCADE qua <code>post_tag</code>).</p></header>
-        <div class="keys"><div><b>Khoá:</b> id PK · slug varchar(160) UQ · name varchar(120) · description text</div></div>
+        <div class="keys"><div><b>Cột:</b> id bigint PK · name varchar(120) · slug varchar(160) UQ · description text · created_at · updated_at</div></div>
       </article>
 
       <article class="table-card" id="slug_history">
@@ -436,24 +437,24 @@ erDiagram
           <thead><tr><th>Cột</th><th>Kiểu</th><th>Null</th><th>Ghi chú</th></tr></thead>
           <tbody>
             <tr><td class="col">id<span class="k pk">PK</span></td><td class="type">binary(16)</td><td class="null">không</td><td class="note">UUID v7; frontend dùng để chống trùng</td></tr>
-            <tr><td class="col">kind</td><td class="type">varchar(48)</td><td class="null">không</td><td class="note">Ví dụ <code>post.published</code>, <code>category.updated</code>, <code>menu.updated</code></td></tr>
-            <tr><td class="col">subject_type · subject_id</td><td class="type">varchar(16) · bigint</td><td class="null">id có</td><td class="note">Đối tượng thay đổi</td></tr>
+            <tr><td class="col">kind</td><td class="type">varchar(48)</td><td class="null">không</td><td class="note">Ví dụ <code>post.published</code>, <code>category.updated</code>, <code>menu.updated</code>, <code>settings.updated</code></td></tr>
+            <tr><td class="col">subject_type · subject_id</td><td class="type">varchar(16) · bigint</td><td class="null">id có</td><td class="note">Đối tượng thay đổi: <code>post</code> · <code>page</code> · <code>category</code> · <code>tag</code> · <code>author</code> · <code>menu</code> · <code>settings</code> (id null)</td></tr>
             <tr><td class="col">payload</td><td class="type">json</td><td class="null">không</td><td class="note"><code>{"tags": […], "paths": {"old": […], "new": […]}}</code></td></tr>
             <tr><td class="col">created_at</td><td class="type">datetime(6)</td><td class="null">không</td><td class="note"></td></tr>
             <tr><td class="col">delivered_at</td><td class="type">datetime(6)</td><td class="null">có</td><td class="note">Có giá trị khi frontend đã nhận</td></tr>
-            <tr><td class="col">attempts</td><td class="type">int</td><td class="null">không</td><td class="note">Số lần đã gửi</td></tr>
+            <tr><td class="col">attempts</td><td class="type">int</td><td class="null">không</td><td class="note">Số lần đã gửi; mặc định 0</td></tr>
             <tr><td class="col">last_error</td><td class="type">varchar(500)</td><td class="null">có</td><td class="note">Đã che secret</td></tr>
             <tr><td class="col">job_id</td><td class="type">binary(16)</td><td class="null">có</td><td class="note">Job gửi đang xử lý; poller không gửi lại khi job còn trong hàng đợi</td></tr>
-            <tr><td class="col">gave_up_at</td><td class="type">datetime(6)</td><td class="null">có</td><td class="note">Đã bỏ cuộc (lỗi vĩnh viễn hoặc hết 8 lần)</td></tr>
+            <tr><td class="col">gave_up_at</td><td class="type">datetime(6)</td><td class="null">có</td><td class="note">Đã bỏ cuộc (lỗi vĩnh viễn hoặc hết 8 lần): poller không gửi lại; người vận hành có thể chạy lại job trên trang Queue</td></tr>
           </tbody>
         </table></div>
-        <div class="keys"><div><b>Chỉ mục:</b> (delivered_at, created_at) cho poller tìm sự kiện chưa gửi</div></div>
+        <div class="keys"><div><b>Chỉ mục:</b> (delivered_at, created_at) cho poller tìm sự kiện chưa gửi · (subject_type, subject_id, created_at) để tra các sự kiện của một đối tượng</div></div>
       </article>
 
       <article class="table-card" id="public_media">
-        <header><div class="row"><h3>public_media</h3></div><p>Ảnh nào đang được nội dung công khai sử dụng. Route ảnh công khai chỉ phục vụ ảnh có ở đây, nên ảnh của bản nháp không lộ ra ngoài. Một ảnh dùng ở nhiều bài có nhiều dòng; gỡ đăng một bài không làm ẩn ảnh mà bài khác còn dùng.</p></header>
+        <header><div class="row"><h3>public_media</h3></div><p>Ảnh nào đang được nội dung công khai sử dụng. Route ảnh công khai chỉ phục vụ ảnh có ở đây, nên ảnh của bản nháp không lộ ra ngoài. Một ảnh dùng ở nhiều bài có nhiều dòng; gỡ đăng một bài không làm ẩn ảnh mà bài khác còn dùng. Dòng của một bài đang công khai gồm cả avatar của tác giả. Logo và ảnh chia sẻ mặc định của settings cũng công khai, qua các dòng subject <code>settings</code> mà trang settings ghi lại khi lưu; <code>content:sync-public-media</code> dựng lại toàn bộ bảng.</p></header>
         <div class="keys">
-          <div><b>Cột:</b> media_id binary(16) · subject_type varchar(16) (<code>post</code> · <code>page</code>) · subject_id bigint</div>
+          <div><b>Cột:</b> media_id binary(16) · subject_type varchar(16) (<code>post</code> · <code>page</code> · <code>settings</code>) · subject_id bigint (với <code>settings</code>: 1 = General, logo; 2 = SEO, ảnh chia sẻ)</div>
           <div><b>Khoá:</b> PK (media_id, subject_type, subject_id) · chỉ mục (subject_type, subject_id)</div>
         </div>
       </article>
@@ -472,6 +473,7 @@ erDiagram
             <tr><td class="col">created_at</td><td class="type">datetime(6)</td><td class="null">không</td><td class="note"></td></tr>
           </tbody>
         </table></div>
+        <div class="keys"><div><b>Chỉ mục:</b> token_hash UQ · (subject_type, subject_id) · created_by</div></div>
       </article>
 
       <article class="table-card" id="media_moves">
@@ -487,22 +489,22 @@ erDiagram
 
       <article class="table-card core">
         <header><div class="row"><h3>users</h3><span class="tag core">RustCMS</span></div><p>Người dùng của trang quản trị và user hệ thống <code>frontend@rblog.local</code> mà Content API key thuộc về.</p></header>
-        <div class="keys"><div><b>Cột chính:</b> id bigint PK · name · email UQ · password (băm argon2) · is_active · locale · email_verified_at · created_at · updated_at</div></div>
+        <div class="keys"><div><b>Cột chính:</b> id bigint PK · name · email UQ · password (băm argon2) · is_active · auth_version · locale · email_verified_at · invitation_pending · invited_at · invited_by · created_at · updated_at</div></div>
       </article>
 
       <article class="table-card core">
-        <header><div class="row"><h3>media</h3><span class="tag core">RustCMS</span></div><p>Thư viện file đã upload. Chỉ nhận PNG, JPEG, GIF, WebP, PDF; tối đa 10 MiB; SVG luôn bị từ chối.</p></header>
-        <div class="keys"><div><b>Cột chính:</b> id binary(16) PK · disk (<code>local</code> hoặc <code>s3</code>) · key · name · mime · size · sha256 · width · height · owner_id · created_at · deleted_at</div></div>
+        <header><div class="row"><h3>media</h3><span class="tag core">RustCMS</span></div><p>Thư viện file đã upload. Chỉ nhận PNG, JPEG, GIF, WebP, PDF; tối đa 10 MiB (<code>config/storage.toml</code>); SVG luôn bị từ chối. <code>alt</code> (RustCMS 0.10.1) là văn bản thay thế sửa trong thư viện media: Content API dùng nó khi tài liệu không có alt riêng.</p></header>
+        <div class="keys"><div><b>Cột chính:</b> id binary(16) PK · disk (<code>local</code> hoặc <code>s3</code>) · key · name · mime · size · sha256 · width · height · owner_id · created_at · deleted_at · alt varchar(500)</div></div>
       </article>
 
       <article class="table-card core">
-        <header><div class="row"><h3>settings</h3><span class="tag core">RustCMS</span></div><p>Mỗi nhóm settings một dòng: <code>general</code>, <code>reading</code>, <code>seo</code>, <code>integrations</code>. Secret (webhook secret) mã hoá bằng APP_KEY trong cột <code>secrets</code>.</p></header>
+        <header><div class="row"><h3>settings</h3><span class="tag core">RustCMS</span></div><p>Mỗi nhóm settings một dòng: <code>general</code>, <code>reading</code>, <code>seo</code>, <code>integrations</code>. Secret (webhook secret) mã hoá bằng APP_KEY trong cột <code>secrets</code>. Logo (<code>general.logo</code>) và ảnh chia sẻ mặc định (<code>seo.og_image</code>) là id của media; <code>seo.og_image_url</code> cũ chỉ còn được đọc khi chưa chọn ảnh chia sẻ.</p></header>
         <div class="keys"><div><b>Cột:</b> name varchar(32) PK · value json · secrets json · version bigint · updated_at · updated_by</div></div>
       </article>
 
       <article class="table-card core">
         <header><div class="row"><h3>personal_access_tokens</h3><span class="tag core">RustCMS</span></div><p>Content API key của frontend (quyền duy nhất <code>content.read</code>). Chỉ lưu hash.</p></header>
-        <div class="keys"><div><b>Cột:</b> id · user_id · name · token_hash · abilities · last_used_at · expires_at · revoked_at · created_at</div></div>
+        <div class="keys"><div><b>Cột:</b> id · user_id (→ <code>users.id</code>, CASCADE) · name · token_hash · abilities · last_used_at · expires_at · revoked_at · created_at</div></div>
       </article>
 
       <div class="prose">
@@ -525,8 +527,8 @@ erDiagram
       <div class="rules">
         <div class="rule">
           <h3>Vòng đời một bài</h3>
-          <p class="flow">draft → pending → scheduled → published</p>
-          <p>Gửi duyệt cần quyền sửa bài. Đăng, hẹn giờ, gỡ đăng cần <code>posts.publish</code>. Scheduler chạy mỗi phút, đăng mọi bài <code>scheduled</code> đã tới giờ, kể cả bài bị lỡ khi app tắt.</p>
+          <p class="flow">draft → pending → scheduled → published<br>published, scheduled → draft (gỡ đăng)</p>
+          <p>Gửi duyệt (chỉ từ draft) cần quyền sửa bài. Đăng và hẹn giờ (từ draft, pending, scheduled) cần <code>posts.publish</code>; gỡ đăng cần <code>posts.unpublish</code>; bài của người khác cần thêm <code>posts.edit_others</code>. Mỗi dòng bài viết và trang chỉ hiện các thao tác hợp với trạng thái của nó; chạy một thao tác trên một bản ghi không hợp thì bị từ chối (403). Lịch <code>publish-due</code> chạy mỗi phút, đăng mọi bài và trang <code>scheduled</code> đã tới giờ, kể cả bài bị lỡ khi app tắt.</p>
         </div>
         <div class="rule">
           <h3>Thế nào là "đang công khai"</h3>
@@ -534,7 +536,15 @@ erDiagram
         </div>
         <div class="rule">
           <h3>Một đường ghi chung</h3>
-          <p>Mọi thay đổi bài (lưu, đăng, thùng rác, khôi phục, gắn thẻ) đi qua một service, cập nhật trong cùng transaction: <code>search_text</code>, <code>public_media</code>, <code>slug_history</code>, revision và <code>content_events</code>.</p>
+          <p>Mọi thay đổi bài (lưu, đăng, thùng rác, khôi phục, gắn thẻ, khôi phục phiên bản) đi qua một service, cập nhật trong cùng transaction: <code>search_text</code>, <code>public_media</code>, <code>slug_history</code>, revision và <code>content_events</code>.</p>
+        </div>
+        <div class="rule">
+          <h3>Khôi phục phiên bản</h3>
+          <p>Khoá bài, đọc lại bản đó dưới khoá, kiểm tra quyền sửa và mọi ảnh (còn, không trong thùng rác, là ảnh, người dùng được xem). Chuyên mục đã xoá thì để trống, thẻ đã xoá thì bỏ qua. Trạng thái, slug và ngày không đổi; một revision mới được ghi khi nội dung khác bản mới nhất, và bản vừa khôi phục không bị dọn dù đã ngoài 30 bản.</p>
+        </div>
+        <div class="rule">
+          <h3>Ảnh của settings</h3>
+          <p>Logo (PNG, WebP, JPEG, 1 MB) và ảnh chia sẻ mặc định (ảnh, 5 MB) chọn từ thư viện media. Lưu General hoặc SEO ghi lại các dòng <code>public_media</code> subject <code>settings</code> của nhóm đó; lưu General, Reading hoặc SEO ghi một sự kiện <code>settings.updated</code> (tag <code>settings</code>), cùng transaction. Integrations không ghi sự kiện.</p>
         </div>
         <div class="rule">
           <h3>Tìm kiếm tiếng Việt</h3>
@@ -552,7 +562,7 @@ erDiagram
     </section>
 
     <footer>
-      Nguồn: <code>SHOW CREATE TABLE</code> trên database dev, nhánh <code>main</code> tại commit 86a8174 (24/10/2026), cùng migration trong <code>src/database/migrations/</code>. Phần bài viết (Post, Page) đang hoàn thiện resource và quy trình đăng; schema các bảng đã cố định.
+      Nguồn: <code>SHOW CREATE TABLE</code> trên database dev, nhánh <code>main</code> tại commit 663499e (24/10/2026, RustCMS-Core v0.10.2), cùng migration trong <code>src/database/migrations/</code> và của RustCMS.
     </footer>
   </main>
 </div>
