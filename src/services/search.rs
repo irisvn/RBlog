@@ -27,8 +27,9 @@ pub fn normalize(text: &str) -> String {
     out
 }
 
-/// The text of a RustCMS rich-text document, one line per block (code blocks included, image
-/// alt texts left out). Empty when `document` is not a valid document.
+/// The text of a RustCMS rich-text document, one line per block: code blocks, table cells,
+/// callouts and image captions included; image alt texts, embeds and anything `Node` gains in a
+/// later RustCMS left out. Empty when `document` is not a valid document (version 1 or 2).
 pub fn plain_text(document: &Value) -> String {
     fn walk(nodes: &[Node], out: &mut String) {
         for node in nodes {
@@ -43,8 +44,15 @@ pub fn plain_text(document: &Value) -> String {
                 Node::BulletList(children)
                 | Node::OrderedList(children)
                 | Node::ListItem(children)
-                | Node::Blockquote(children) => walk(children, out),
-                Node::HorizontalRule | Node::Image { .. } => {}
+                | Node::Blockquote(children)
+                | Node::Callout(_, children) => walk(children, out),
+                Node::Table(table) => {
+                    for cell in table.rows.iter().flatten() {
+                        walk(&cell.content, out);
+                    }
+                }
+                Node::Image(image) if !image.caption.is_empty() => line(out, &image.caption),
+                _ => {}
             }
         }
     }
@@ -114,6 +122,24 @@ mod tests {
         ]});
         assert_eq!(plain_text(&document), "Tiêu đề\nXin chào bạn\nmột\nhai\nlet x = 1;");
         assert_eq!(normalize(&plain_text(&document)), "tieu de xin chao ban mot hai let x = 1;");
+    }
+
+    #[test]
+    fn plain_text_reads_tables_callouts_and_captions() {
+        let cell = |kind: &str, text: &str| json!({"type": kind, "content": [{"type": "paragraph", "content": [{"type": "text", "text": text}]}]});
+        let document = json!({"type": "doc", "version": 2, "content": [
+            {"type": "table", "content": [
+                {"type": "tableRow", "content": [cell("tableHeader", "Gói"), cell("tableHeader", "Giá")]},
+                {"type": "tableRow", "content": [cell("tableCell", "Phở bò"), cell("tableCell", "50k")]}
+            ]},
+            {"type": "callout", "attrs": {"tone": "warn"}, "content": [
+                {"type": "paragraph", "content": [{"type": "text", "text": "Lưu ý"}]}
+            ]},
+            {"type": "image", "attrs": {"media": "0199d3a4-1b2c-7d3e-8f40-123456789abc", "alt": "ảnh", "caption": "Chú thích"}},
+            {"type": "image", "attrs": {"media": "0199d3a4-1b2c-7d3e-8f40-123456789abd", "alt": "không chú thích"}},
+            {"type": "embed", "attrs": {"provider": "youtube", "id": "dQw4w9WgXcQ"}}
+        ]});
+        assert_eq!(plain_text(&document), "Gói\nGiá\nPhở bò\n50k\nLưu ý\nChú thích");
     }
 
     #[test]

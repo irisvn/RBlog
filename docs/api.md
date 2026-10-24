@@ -39,7 +39,7 @@ changes by a **webhook**.
 | Method and path | What |
 |---|---|
 | `GET /posts` | published posts; filters below |
-| `GET /posts/{slug}` | one post, with `html`; an old slug answers `{ "redirect": "<new slug>" }` |
+| `GET /posts/{slug}` | one post, with `html` and `outline`; an old slug answers `{ "redirect": "<new slug>" }` |
 | `GET /pages`, `GET /pages/{slug}` | static pages: a post without `category`, `tags`, `featured`; old slugs redirect the same way |
 | `GET /categories`, `GET /categories/{slug}` | `{id, slug, name, description, meta_title, meta_description, post_count}`; old slugs redirect |
 | `GET /tags`, `GET /tags/{slug}` | `{id, slug, name, description, post_count}`; old slugs redirect |
@@ -69,8 +69,8 @@ content that is not published is a plain 404.
 
 ### Lists and single records
 
-List items (`GET /posts`, `GET /pages`) carry every field of a single record except `html` and
-`document`: fetch the record for its body.
+List items (`GET /posts`, `GET /pages`) carry every field of a single record except `html`,
+`outline` and `document`: fetch the record for its body.
 
 ## A post
 
@@ -80,7 +80,8 @@ List items (`GET /posts`, `GET /pages`) carry every field of a single record exc
   "slug": "xin-chao-viet-nam",
   "title": "Xin chào Việt Nam",
   "excerpt": "…",
-  "html": "<p>…</p>",
+  "html": "<h2 id=\"gioi-thieu\">Giới thiệu</h2><p>…</p>",
+  "outline": [{ "level": 2, "text": "Giới thiệu", "id": "gioi-thieu" }],
   "cover": { "url": "https://cms.example.com/api/v1/media/…/cover.jpg", "width": 1600, "height": 900, "alt": "…" },
   "category": { "slug": "du-lich", "name": "Du lịch" },
   "tags": [{ "slug": "ha-noi", "name": "Hà Nội" }],
@@ -93,17 +94,76 @@ List items (`GET /posts`, `GET /pages`) carry every field of a single record exc
 }
 ```
 
-- `html` is the body rendered by RustCMS (every text escaped). An image that is not public
-  (see below) is left out of it, and `cover` or `seo.og_image` is then `null`.
+- `html` is the body rendered by RustCMS (every text escaped; [Rich text](#rich-text) lists the
+  elements it holds). An image that is not public (see below) is left out of it, wherever it
+  sits in the document, and `cover` or `seo.og_image` is then `null`.
+- `outline` lists the body's headings in order, `{level, text, id}`, `id` being the `id` of
+  that heading in `html`: a table of contents. `[]` without headings.
 - Image URLs are absolute, on `APP_URL`. The last segment is the file name, cosmetic only.
 - `cover.alt` is the media's file name until media get alt texts.
 - `seo.og_image` is the URL of the OG image (a string), or `null`.
 - `author.slug` is `null` when the author has no public profile; `category` is `null` without
   one; `tags` keep the order set in the admin.
 
-`?include=document` adds `document`, the rich-text JSON, for frontends that render it with their
-own components instead of `html` (any other `include` value is 422). Its images are media ids:
-show those whose URL appears in `html` or `cover`.
+`?include=document` adds `document`, the rich-text JSON exactly as stored (version 1 or 2, see
+below), for frontends that render it with their own components instead of `html` (any other
+`include` value is 422). Its images are media ids: show those whose URL appears in `html` or
+`cover`.
+
+## Rich text
+
+Bodies are RustCMS rich-text documents (RustCMS 0.10). The admin's editor writes the lowest
+version a body needs, so both versions are stored side by side and **a frontend must handle
+both**:
+
+- **Version 1**: paragraphs, headings (levels 2 to 4), bullet and ordered lists, quotes, code
+  blocks, horizontal rules, images (`media`, `alt`); marks bold, italic, strike, code and links.
+- **Version 2** is version 1 plus tables, embeds, callouts, and an image `caption` and `width`.
+  Nothing in version 1 changes meaning in version 2.
+
+Rendering `html` needs nothing else. The elements below are the new part of its vocabulary
+(no `style` attribute, no `class` except on callouts, no scripts):
+
+| Node | In `html` |
+|---|---|
+| heading | `<h2 id="gioi-thieu">…</h2>` (`h2` to `h4`; ids below) |
+| image | `<figure data-width="wide"><img src="…" width="1600" height="900" alt="…"><figcaption>…</figcaption></figure>` |
+| table | `<table><thead><tr><th><p>…</p></th></tr></thead><tbody><tr><td><p>…</p></td></tr></tbody></table>` |
+| embed | `<figure data-embed="youtube" data-id="dQw4w9WgXcQ"><a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" rel="noopener noreferrer">…</a></figure>` |
+| callout | `<aside class="callout" data-tone="info">…</aside>` (`info` or `warn`; paragraphs and lists) |
+
+- **Images**: `width` and `height` are the media's pixel size, present when RBlog knows both
+  (pass them to `next/image` or `<NuxtImg>`, or use them for `aspect-ratio`, so the page does
+  not jump). `data-width` is `wide` or `full` when the editor chose it (absent: normal width).
+  `figcaption` is plain text, absent without a caption. Images sit at the top level, in quotes
+  and in list items (also in a callout's lists); table cells hold text only.
+- **Tables** are rectangular, with no spans and no widths; the header row, when there is one, is
+  the `thead`. At most 50 rows of 20 cells.
+- **Embeds** (the embed contract): only `youtube` and `vimeo`. RustCMS checks `data-id` against
+  the provider's format (YouTube `[A-Za-z0-9_-]{11}`, Vimeo `[1-9][0-9]{0,14}`), so it is safe in
+  an attribute or a player URL; the document never holds a URL or HTML for them. Without
+  JavaScript the figure is a plain link. To show the player, replace the figure with an iframe
+  built from `data-embed` and `data-id` only (`https://www.youtube-nocookie.com/embed/{id}`,
+  `https://player.vimeo.com/video/{id}`), and allow that host in the frontend's CSP
+  (`frame-src`). The admin itself never loads the providers.
+- **Heading ids** are bare slugs of the heading text: diacritics folded (`Đà Nẵng` →
+  `da-nang`), lower-case ASCII letters and digits joined by `-`, at most 80 characters; a
+  repeated heading gets `-2`, `-3`; a heading without letters or digits is `section`. They are
+  derived, not stored: the same text in the same order keeps its id, an edited heading changes
+  it. RBlog adds **no prefix**: the plain-slug contract keeps `html` and `outline` in step.
+  An id may therefore clash with an id of your layout (`main`, `comments`) or of a second body
+  on the same page, and may start with a digit. Recommended: give your layout's own ids a
+  character slugs never hold (`site_main`, `_comments`), render one body per page, and select
+  headings with `CSS.escape(id)`. A frontend that wants prefixed anchors (`#h-gioi-thieu`)
+  rewrites the `id="…"` of `h2`–`h4` in `html` and the `outline` ids with the same prefix.
+- In `document`, version 2 nodes are `table` (`tableRow` of `tableHeader` or `tableCell`, each
+  holding paragraphs), `embed` (`attrs: {provider, id}`) and `callout` (`attrs: {tone}`, holding
+  paragraphs and lists), and an image may have `attrs.caption` and `attrs.width` (`normal`,
+  `wide`, `full`). A frontend that renders `document` itself must accept `"version": 1` and
+  `"version": 2`, and skip node types it does not know (a later RustCMS may add some, with a new
+  version).
+- Search (`q`) and `reading_minutes` count the text of table cells, callouts and image captions;
+  embeds and image alt texts add nothing.
 
 ## Menus
 

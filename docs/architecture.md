@@ -1,7 +1,7 @@
 # Architecture
 
 RBlog is the admin back office of a blog and its read-only Content API: one Rust binary on
-RustCMS-Core (v0.9.0) and MySQL 8.4. The public site is a separate Nuxt/Next app
+RustCMS-Core (v0.10.0) and MySQL 8.4. The public site is a separate Nuxt/Next app
 (docs/frontend-integration.html, docs/api.md). This page says where things live and how a change
 travels from the admin to the public site. The database is described in docs/db-design.html.
 
@@ -34,9 +34,9 @@ travels from the admin to the public site. The database is described in docs/db-
 | `events` | dispatches the webhook job in the event's transaction; the poller re-dispatches lost events |
 | `webhook` | signing, SSRF-safe delivery, retryable vs permanent errors |
 | `revisions` | one revision per editorial change (content hash), 30 kept, restore with permission and reference checks |
-| `public_media` | which media the public may download, per subject; `sync` and `backfill` |
+| `public_media` | which media the public may download, per subject (images anywhere in a body, callouts included, through `rich_text::media_ids`); `sync` and `backfill` |
 | `preview` | preview tokens (hashed, one hour, revocable) and the frontend preview link |
-| `search` | the accent-free normalizer, plain text of a rich-text document, the LIKE pattern for `q` |
+| `search` | the accent-free normalizer, plain text of a rich-text document (version 1 or 2: table cells, callouts and image captions included, embeds not), the LIKE pattern for `q` |
 | `slug`, `taxonomy`, `authors`, `menus` | slugs and slug history; category, tag, author and menu rules |
 | `content_api` | the frontend system user, its `content-reader` role, issuing and revoking Content API keys |
 | `site` | the public settings the Content API returns |
@@ -64,6 +64,18 @@ commit
 
 Everything up to the commit happens in one transaction: if any step fails, nothing is written
 and no event is sent. Delivery is at least once; the frontend deduplicates on the event id.
+
+## Rich text
+
+Bodies are RustCMS rich-text documents, stored as JSON. RustCMS 0.10 added version 2 (tables,
+YouTube/Vimeo embeds, callouts, image captions and widths); the editor writes the lowest version
+a body needs, so version 1 and 2 bodies live side by side and nothing is migrated. The Content API
+renders `html` with `rich_text::to_html_with` (images as figures with their media row's width and
+height, public images only, or the preview's own image URLs) and `outline` with
+`rich_text::outline`; heading ids are RustCMS's bare slugs, with no prefix
+(`src/http/resources/content/entry.rs`). `?include=document` returns the stored document as is.
+A RustCMS older than 0.10 refuses version 2 bodies: do not roll the binary back below 0.10 once
+such a body is saved.
 
 ## Rules that must keep holding
 

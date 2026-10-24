@@ -16,6 +16,8 @@
 //   RBLOG_SHOT_SCALE     the device pixel ratio (1)
 //   RBLOG_SHOT_POST      the post whose page and edit form are shot (1), and its title
 //   RBLOG_SHOT_POST_TITLE (Ba ngày ở Đà Nẵng): the list row whose Schedule dialog is shot
+//   RBLOG_SHOT_RICH_POST the post whose rich-text editor is shot (RBLOG_SHOT_POST): it must hold
+//                        an image, a table, a callout and a video embed
 //   RBLOG_SHOT_PAGE      the page whose view (preview slot) and edit form are shot (1)
 //   RBLOG_SHOT_AUTHOR    the author profile (its user id) whose edit form is shot (4)
 //
@@ -157,6 +159,44 @@ const SEQUENCES = [
       }, true],
     ],
   },
+  // The rich-text editor (RustCMS 0.10) on RBLOG_SHOT_RICH_POST, a post holding a captioned
+  // image, a table, a callout and a video embed: the form, the embed card, the image details
+  // dialog and the two media library pickers (body images, cover). Nothing is saved: every
+  // dialog is closed with Escape.
+  {
+    path: `/r/posts/records/${env("RBLOG_SHOT_RICH_POST", env("RBLOG_SHOT_POST", "1"))}/edit`,
+    steps: [
+      ["post-edit-rich", async () => {}, true],
+      ["post-embed-card", async (page) => {
+        await richEditor(page).locator("figure[data-embed]").scrollIntoViewIfNeeded();
+        await settle(page, 300);
+      }],
+      ["post-image-details", async (page) => {
+        const image = richEditor(page).locator("figure[data-rich-image] img").first();
+        await image.scrollIntoViewIfNeeded();
+        await image.click();
+        await page.getByRole("button", { name: /^(Image details|Chi tiết ảnh)$/ }).click();
+        await dialog(page).waitFor({ timeout: 5000 });
+        await settle(page);
+      }],
+      ["post-media-picker", async (page) => {
+        await page.keyboard.press("Escape");
+        await settle(page, 300);
+        await page.getByRole("button", { name: /^(Insert image|Chèn ảnh)$/ }).click();
+        await dialog(page).waitFor({ timeout: 5000 });
+        await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
+        await settle(page, 1000);
+      }],
+      ["post-cover-picker", async (page) => {
+        await page.keyboard.press("Escape");
+        await settle(page, 300);
+        await page.getByRole("button", { name: /^(Media library|Thư viện tệp)$/ }).first().click();
+        await dialog(page).waitFor({ timeout: 5000 });
+        await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
+        await settle(page, 1000);
+      }],
+    ],
+  },
   // The other generated screens: one full-page shot each (nothing is saved). The preview slot
   // needs General → Public site URL (and Integrations → Preview path) to show its link.
   screen("/", "dashboard"),
@@ -189,6 +229,11 @@ const SEQUENCES = [
 /** A sequence of one full-page shot `name` of `path`. */
 function screen(path, name) {
   return { path, steps: [[name, async () => {}, true]] };
+}
+
+/** The post form's rich-text editor (its body). */
+function richEditor(page) {
+  return page.locator("[contenteditable=true]").first();
 }
 
 /** Asks the preview slot for a link (a preview token, valid one hour) and waits for it. */
