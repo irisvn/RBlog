@@ -1,7 +1,7 @@
 # Content API
 
-> **Status: implemented (phase P3), read side.** This page is the contract the Nuxt/Next frontend
-> is built against.
+> **Status: implemented, read side (RustCMS 0.10.2).** This page is the contract the Nuxt/Next
+> frontend is built against.
 
 RBlog is the admin and the content source; the public site is a separate Nuxt or Next app that
 reads RBlog's **read-only Content API** from its server side (SSR, ISR) and is told about
@@ -18,12 +18,14 @@ changes by a **webhook**.
     `token.revoked`). The page calls `{admin}/api/x/integrations/content-keys` (`GET`, `POST`,
     `DELETE /{id}`, `src/routes/admin.rs`).
   - A key is an API token of the system user `frontend@rblog.local` (API-guard role
-    `content-reader`, made by `rblog db:seed`), limited to the one permission `content.read`.
+    `content-reader`, made by `rblog db:seed`, seeder `content_api`, or by the first key made on
+    the page), limited to the one permission `content.read`.
   - No key, or an invalid, expired or revoked one: **401**. A token without `content.read`
     (another user's, or one issued with other abilities): **403**.
 - Published means `status = published`, `published_at` reached, not in the trash. Nothing else
   is ever answered, not even through an old slug.
-- Lists: `?page` (from 1) and `?per_page` (default 20, at most 100), answered as
+- Lists: `?page` (1 to 10,000) and `?per_page` (default 20, at most 100; outside these ranges:
+  422), answered as
   `{ "data": [...], "meta": { "page", "perPage", "total", "lastPage" } }`. Posts and pages come
   newest first (`published_at`, then `id`, both descending: stable across pages); categories
   and tags by name.
@@ -32,7 +34,17 @@ changes by a **webhook**.
 - Paths: RBlog names each public page of the frontend the same way everywhere (menus, sitemap,
   webhook): `/posts/{slug}`, `/{slug}` for a page, `/categories/{slug}`, `/tags/{slug}`,
   `/authors/{slug}`. Map them to your routes if they differ.
-- Errors: RustCMS's envelope `{ "message", "code", "errors" }` with 401, 403, 404, 422, 429.
+- Errors: RustCMS's envelope `{ "message", "code", "errors" }` with 401 (`unauthenticated`), 403,
+  404 (`not_found`), 422 (`validation_failed`) and 429. A 422 also carries `issues` (per field,
+  `{code, params}` such as `invalid`, `given_twice`, `max_length`), and the empty `formErrors` and
+  `formIssues`:
+
+  ```json
+  { "message": "The given data was invalid.", "code": "validation_failed",
+    "errors": { "featured": ["is invalid"] },
+    "issues": { "featured": [{ "code": "invalid", "params": {} }] },
+    "formErrors": [], "formIssues": [] }
+  ```
 
 ## Endpoints
 
@@ -47,7 +59,7 @@ changes by a **webhook**.
 | `GET /menus/{key}` | `primary`, `footer`: `{key, name, items}`, links resolved (only to published content) |
 | `GET /settings` | the public site settings (name, description, language, frontend URL, posts per page, logo, SEO defaults, social links, homepage): see [Settings](#settings) |
 | `GET /sitemap?type=post&after=<cursor>` | `{type, path, lastmod}` in batches of 1000, for the frontend's sitemap |
-| `GET /api/v1/preview?token=<token>` | a draft, for the frontend's preview route (short-lived token, `no-store`), no key needed |
+| `GET /api/v1/preview?token=<token>` | a draft, for the frontend's preview route (short-lived token, `no-store`), no key needed; `?include=document` as for posts |
 | `GET /api/v1/preview/media/{id}?token=<token>` | an image of that draft |
 | `GET /api/v1/media/{id}/{name}` | a public image (only images of published content), no key needed |
 
@@ -83,14 +95,14 @@ List items (`GET /posts`, `GET /pages`) carry every field of a single record exc
   "html": "<h2 id=\"gioi-thieu\">Giới thiệu</h2><p>…</p>",
   "outline": [{ "level": 2, "text": "Giới thiệu", "id": "gioi-thieu" }],
   "cover": { "url": "https://cms.example.com/api/v1/media/…/cover.jpg", "width": 1600, "height": 900, "alt": "…" },
-  "category": { "slug": "du-lich", "name": "Du lịch" },
-  "tags": [{ "slug": "ha-noi", "name": "Hà Nội" }],
   "author": { "slug": "an", "name": "An" },
-  "featured": false,
   "published_at": "2026-10-24T08:00:00Z",
   "updated_at": "2026-10-24T09:12:00Z",
   "reading_minutes": 4,
-  "seo": { "meta_title": null, "meta_description": null, "canonical_url": null, "og_image": null }
+  "seo": { "meta_title": null, "meta_description": null, "canonical_url": null, "og_image": null },
+  "category": { "slug": "du-lich", "name": "Du lịch" },
+  "tags": [{ "slug": "ha-noi", "name": "Hà Nội" }],
+  "featured": false
 }
 ```
 
@@ -105,7 +117,8 @@ List items (`GET /posts`, `GET /pages`) carry every field of a single record exc
   `document` (`?include=document`) stays as stored. Editing a file's alt text in the media
   library sends **no webhook** (the library is RustCMS's, with no hook RBlog could use): the
   new text shows once the content is revalidated for another reason or its cache expires.
-- `seo.og_image` is the URL of the OG image (a string), or `null`.
+- `seo.og_image` of a post or page is the URL of its OG image (a string), or `null`: unlike
+  `cover` and the settings' `seo.og_image`, it is not an `{url, width, height, alt}` object.
 - `author.slug` is `null` when the author has no public profile; `category` is `null` without
   one; `tags` keep the order set in the admin.
 
@@ -213,7 +226,8 @@ scheduled, trashed, deleted) are left out, with the items under them.
 
 ## Sitemap
 
-`GET /sitemap?type=post|page|category|tag[&after=<cursor>]` answers
+`GET /sitemap?type=post|page|category|tag[&after=<cursor>]` (`type` is required; a missing or
+unknown `type`, or an `after` that is not a cursor, is 422) answers
 `{ "data": [{ "type", "path", "lastmod" }], "next": "<cursor>" | null }`: at most 1000 entries,
 then `next` until the last batch. Pass `next` back as `after`; treat it as opaque. Posts and
 pages are the published ones; categories and tags those with a published post. `lastmod` is the
@@ -221,13 +235,18 @@ record's last change.
 
 ## Images
 
-`GET /api/v1/media/{id}/{name}` needs no key: it is the URL in `html` and `cover`.
+`GET /api/v1/media/{id}/{name}` needs no key.
 
 - It serves an image (PNG, JPEG, GIF, WebP) used by published content (cover, OG image, body,
-  or the avatar of an author with a published post), unless the image is in the trash. Anything
-  else is the same 404, whether it exists or not.
+  or the avatar of an author with a published post) or by the public settings (the logo, the
+  default share image), unless the image is in the trash. Anything else is the same 404, whether
+  it exists or not.
+- `GET /api/v1/media/{id}/{name}` is the URL in `html`, `cover`, avatars, `logo` and
+  `seo.og_image` (except the settings' fallback to an old `og_image_url`, which keeps its saved
+  address: see [Settings](#settings)).
 - `Cache-Control: public, max-age=3600` (an image that stops being public stays at most an hour
-  in caches; never `immutable`), `X-Content-Type-Options: nosniff`, a sandboxing CSP.
+  in caches; never `immutable`), `X-Content-Type-Options: nosniff`, and the sandboxing CSP
+  `sandbox; default-src 'none'`.
 - Rate limited per client address (600 a minute, then 429 with `Retry-After`). Put a CDN in
   front of it for real traffic.
 
@@ -238,13 +257,20 @@ A preview link from the admin carries a token (43 letters and digits). Its front
 is a query parameter, not a path segment, so that it stays out of RBlog's request log (which
 records paths only).
 
-- The answer is the post or page as above, in whatever status, plus
+- The answer is the post or page as above (`html`, `outline`, and `document` with
+  `?include=document`), in whatever status, plus
   `"preview": { "type": "post" | "page", "status": "draft" | "pending" | "scheduled" | "published" }`.
   `published_at` may be `null`.
 - Its image URLs are `/api/v1/preview/media/{id}?token=<token>`: they serve only the cover, the OG
-  image and the body images of that one post or page (not trashed), while the token works.
-- A token lasts one hour and can be revoked. Expired, revoked and unknown tokens, and a trashed
-  post or page, answer 404.
+  image and the body images of that one post or page (not trashed), while the token works, with
+  the same `nosniff` and sandboxing headers as public images.
+- A token lasts one hour and can be revoked. Expired, revoked, unknown and missing tokens, and a
+  trashed post or page, answer 404.
+- The admin makes the link `{frontend_url}{preview_path}?token=<token>`: Settings → General's
+  public site URL and Settings → Integrations' preview path (default `/preview`). The record's
+  Preview action opens it in a new tab (only for an `https://` public site; with none, or an
+  `http://localhost` one, it says so and makes no link); the preview card of the record page
+  shows it to copy, with its expiry.
 - Every answer (errors included) is `Cache-Control: private, no-store` with
   `Referrer-Policy: no-referrer`: never cache it, never put it behind a shared cache. Rate
   limited per client address (300 a minute for both routes together).
@@ -295,8 +321,11 @@ Settings → Integrations, **at least once** (retried with backoff):
   addresses: RBlog resolves it at every delivery and refuses loopback, private, link-local and
   other special ranges, IPv4 and IPv6. For a receiver on the developer's machine,
   `allow_insecure_local = true` in `config/webhook.toml` also allows `http://` and loopback
-  addresses (never private ranges); RBlog refuses to start with it when `APP_ENV=production`.
-  Settings → Integrations still asks for an `https://` URL;
+  addresses (never private ranges), and Settings → Integrations then accepts an
+  `http://localhost` (or other loopback) URL; RBlog refuses to start with it when
+  `APP_ENV=production`;
+- a webhook URL needs a secret (Settings → Integrations refuses one without it; a delivery that
+  finds none fails without retrying);
 - answer **2xx** within 10 seconds (5 to connect). Redirects are not followed and count as a
   failure. RBlog retries timeouts, connection errors, 408, 425, 429 and 5xx; any other answer
   (3xx, other 4xx) fails the delivery without retrying.
@@ -327,8 +356,9 @@ the change (`src/services/content_sync.rs`). Its payload:
 | `tag.created`, `tag.updated`, `tag.deleted` | a tag is written | `tag:{slug}` (and the old slug on a rename), `posts`, `sitemap` |
 | `author.created`, `author.updated`, `author.deleted` | an author profile is written (`subject.id` is the user's id) | `author:{slug}` (and the old slug on a rename), `posts`, `sitemap` |
 | `menu.created`, `menu.updated`, `menu.deleted` | a menu or one of its items is written (an item change is `menu.updated`) | `menu:{key}` |
-| `post.created`, `post.updated`, `post.published`, `post.unpublished`, `post.trashed`, `post.restored`, `post.deleted` | a post is written (its tags too), goes live (published now, or a scheduled post falls due), goes back to a draft, to the trash or back, or is deleted for good. Submitting and scheduling are `post.updated` | `post:{id}`, `posts`, `category:{slug}` and `tag:{slug}` of its category and tags and of those it just left, `author:{slug}` of its author, `menu:{key}` of menus linking to it, `sitemap` |
+| `post.created`, `post.updated`, `post.published`, `post.unpublished`, `post.trashed`, `post.restored`, `post.deleted` | a post is written (its tags too), goes live (published now, or a scheduled post falls due), goes back to a draft, to the trash or back, or is deleted for good. Submitting, scheduling and restoring a revision are `post.updated` | `post:{id}`, `posts`, `category:{slug}` and `tag:{slug}` of its category and tags and of those it just left, `author:{slug}` of its author, `menu:{key}` of menus linking to it, `sitemap` |
 | `page.created`, …, `page.deleted` | the same for a page | `page:{id}`, `pages`, `author:{slug}`, `menu:{key}`, `sitemap` |
+| `settings.updated` | Settings → General, Reading or SEO and social is saved (`subject.id` is `null`; Integrations records nothing) | `settings` (both path lists empty) |
 
 Keep a fallback time-based revalidation (for example 10 minutes) in case the webhook stays
 unreachable.
