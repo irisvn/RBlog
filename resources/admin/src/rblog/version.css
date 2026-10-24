@@ -12,7 +12,8 @@
 /* How to update: numbered steps, each a title, its command and a note. */
 .version-steps { margin: 0; padding-left: 1.25rem; display: flex; flex-direction: column; gap: 1rem; }
 .version-steps > li { display: flex; flex-direction: column; gap: 0.5rem; min-width: 0; }
-.version-steps p { margin: 0; }
+/* Variable names (RUSTCMS_DATABASE__ALLOW_NEWER_MIGRATIONS=true) are one long word: wrap them. */
+.version-steps p { margin: 0; overflow-wrap: anywhere; }
 .version-step-title { font-weight: 500; }
 /* The kit's CodeBlock scrolls sideways under its copy button on a phone: wrap the command instead. */
 .version-code pre { white-space: pre-wrap; overflow-wrap: anywhere; }
