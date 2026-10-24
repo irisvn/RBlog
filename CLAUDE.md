@@ -1,7 +1,7 @@
 # RBlog — rules for working on this repository
 
 RBlog is the **admin back office** of a blog, built as a **RustCMS application**: one Rust binary
-(`rblog`, axum on RustCMS-Core v0.8.2) with the RustCMS admin panel embedded. The **only**
+(`rblog`, axum on RustCMS-Core v0.10.0) with the RustCMS admin panel embedded. The **only**
 database is **MySQL 8.4**, in development, tests and CI (`docker-compose.yml`,
 `.cargo/config.toml`). Do not add SQLite or PostgreSQL configuration, files or test runs.
 
@@ -265,7 +265,7 @@ document.
   say so.
 - **Stay in scope.** Do what was asked. Mention related improvements; do not make them unasked.
 - **Verify, do not assume.**
-  - Check that a function, flag or path exists (in the code or in `../RustCMS` at tag `v0.8.2`)
+  - Check that a function, flag or path exists (in the code or in `../RustCMS` at the tag `Cargo.toml` pins)
     before you use or recommend it.
   - Run the app (`rustcms serve`, `/health`) to confirm that a change works, not only that it
     compiles.
