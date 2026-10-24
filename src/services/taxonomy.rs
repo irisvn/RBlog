@@ -1,4 +1,4 @@
-//! Writes of categories and tags: their slug, the old slugs kept for redirects
+//! Writes of categories, tags and author profiles: their slug, the old slugs kept for redirects
 //! (`slug_history`) and the outbox event, in the write's transaction.
 //!
 //! A write goes through [`slug_for_create`] or [`slug_for_update`] before it is stored, then
@@ -12,14 +12,16 @@ use rustcms::{AppResult, ValidationErrors};
 use sea_orm::prelude::DateTimeUtc;
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseTransaction, EntityTrait, QueryFilter, QuerySelect, Set};
 
-use crate::models::{category, slug_history, tag};
+use crate::models::{author_profile, category, slug_history, tag};
 use crate::services::content_sync::{self, Change};
 use crate::services::slug::{Slugged, slugify, unique_slug};
 
 /// The message of a typed slug without a letter or digit (translated by the caller).
 pub const SLUG_WITHOUT_LETTERS: &str = "must contain a letter or a digit";
 
-/// A table of the taxonomy: categories or tags.
+/// A table whose records have a public page under a slug, with redirects from old slugs:
+/// categories, tags, and author profiles (whose id is the user's, and whose name is the user's
+/// name).
 pub trait Taxonomy: Slugged + Default {
     /// `subject_type` in `slug_history` and `content_events`.
     const SUBJECT: &'static str;
@@ -31,6 +33,10 @@ impl Taxonomy for category::Entity {
 
 impl Taxonomy for tag::Entity {
     const SUBJECT: &'static str = "tag";
+}
+
+impl Taxonomy for author_profile::Entity {
+    const SUBJECT: &'static str = "author";
 }
 
 /// The slug of a new record: `typed` made a slug (a 422 on `slug` when nothing is left of it),
@@ -156,6 +162,7 @@ async fn event<E: Taxonomy>(
 ) -> AppResult<()> {
     match E::SUBJECT {
         "category" => content_sync::category_changed(txn, change, id, slug, old).await,
+        "author" => content_sync::author_changed(txn, change, id, slug, old).await,
         _ => content_sync::tag_changed(txn, change, id, slug, old).await,
     }
 }

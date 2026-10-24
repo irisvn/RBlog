@@ -4,9 +4,12 @@
 #[path = "../support/mod.rs"]
 mod support;
 
+mod authors;
 mod content_api;
 mod content_media;
 mod content_schema;
+mod dashboard;
+mod demo_seeder;
 mod health;
 mod integrations;
 mod media_disk;

@@ -115,3 +115,26 @@
 "See the Content API keys of the public site, never their secret" = "Xem các khoá Content API của trang công khai, không bao giờ thấy secret"
 "Manage Content API keys" = "Quản lý khoá Content API"
 "Create and revoke the keys the public site reads published content with" = "Tạo và thu hồi các khoá mà trang công khai dùng để đọc nội dung đã đăng"
+
+# Author profiles (admin/resources/author_profile_resource.rs, services::authors) and the
+# read-only users list behind their user field (admin/resources/user_resource.rs).
+"Author" = "Tác giả"
+"Authors" = "Tác giả"
+"User" = "Người dùng"
+"Users" = "Người dùng"
+"Bio" = "Giới thiệu ngắn"
+"Avatar" = "Ảnh đại diện"
+"Website" = "Website"
+"A user without an author profile. It cannot be changed later." = "Một người dùng chưa có hồ sơ tác giả. Không đổi được về sau."
+"Left empty: made from the user's name" = "Để trống: tạo từ tên người dùng"
+"At most 1000 characters" = "Tối đa 1000 ký tự"
+"already has an author profile" = "đã có hồ sơ tác giả"
+"must be at most 1000 characters" = "tối đa 1000 ký tự"
+
+# Dashboard widgets (admin/dashboard.rs); the post widgets are added with the posts resource.
+"Published posts" = "Bài đã đăng"
+"Drafts" = "Bản nháp"
+"Pending review" = "Chờ duyệt"
+"Scheduled" = "Đã lên lịch"
+"Posts published per week" = "Bài đăng mỗi tuần"
+"Recently updated posts" = "Bài cập nhật gần đây"

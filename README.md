@@ -14,6 +14,28 @@ scripts/check.sh fast 'test(post)'   # while coding: only the matching tests
 Releases: push a tag `vX.Y.Z` (matching `Cargo.toml`) on a commit whose CI is green. It builds the
 Linux binaries (x86_64, arm64) and the image `ghcr.io/irisvn/rblog` (`docker/Dockerfile`).
 
+## Demo data
+
+```sh
+rustcms db:seed --class demo   # Vietnamese demo content (src/database/seeders/demo_seeder.rs)
+```
+
+`rustcms db:seed` does not run it. It refuses when `APP_ENV=production` (even with `--force`), and
+running it again adds nothing: every row is found by its email, slug, menu key or menu and label
+first. It creates:
+
+- 3 authors, `thu.ha@`, `minh.quan@` and `hoang.yen@demo.rblog.local`, with author profiles. Their
+  password is random and shown nowhere, and they have no role: a super admin sets a password and
+  roles on the Users page to sign in as one;
+- 4 categories (Du lịch, Ẩm thực, Công nghệ, Đời sống) and 8 tags;
+- 20 posts with a rich-text body: 9 published at different past dates, 3 scheduled, 3 pending
+  review, 3 drafts and 2 in the trash;
+- 2 pages (Giới thiệu, Liên hệ), and the `primary` and `footer` menus linking categories and pages.
+
+Its changes are recorded in the audit log and the outbox (`docs/api.md`, "Webhook"): authors,
+categories, tags and menus. Posts and pages get their `public_media` rows, but no outbox event yet
+(no post or page event exists on this branch).
+
 ### Test and CI times
 
 | | Before | After |

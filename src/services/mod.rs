@@ -1,5 +1,6 @@
 //! Business rules shared by the panel, the API, jobs, seeders and commands.
 
+pub mod authors;
 pub mod content_api;
 pub mod content_sync;
 pub mod events;
