@@ -1,7 +1,7 @@
 //! Preview tokens: a random token shows one post or page, in any status, through
 //! `GET /api/v1/preview/{token}` until it expires (one hour) or is revoked. The token is the
 //! capability: only its SHA-256 is stored, and only who may view the subject issues one (the
-//! admin action checks that before calling [`issue`]).
+//! preview card and the Preview action check that before calling [`issue_link_in`]).
 
 use std::time::{Duration, SystemTime};
 
@@ -75,46 +75,103 @@ pub struct PreviewLink {
     pub expires_at: DateTimeUtc,
 }
 
-/// A preview link for post or page `key`, made by the user of `ctx`:
+/// Where preview links point: the public site (Settings → General) and its preview route
+/// (Settings → Integrations).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Target {
+    frontend: String,
+    path: String,
+}
+
+impl Target {
+    /// The target as saved, read in `conn` (a transaction sees its own writes); `None` while
+    /// Settings → General has no public site URL.
+    pub async fn load<C: ConnectionTrait>(
+        conn: &C,
+        keyring: &rustcms::crypto::Keyring,
+    ) -> rustcms::AppResult<Option<Self>> {
+        use crate::settings::general_settings::GeneralSettings;
+        use crate::settings::integration_settings::IntegrationSettings;
+
+        let general = rustcms::settings::load::<GeneralSettings, _>(conn, keyring).await?;
+        let Some(frontend) = general.frontend_url() else { return Ok(None) };
+        let integrations = rustcms::settings::load::<IntegrationSettings, _>(conn, keyring).await?;
+        Ok(Some(Self { frontend: frontend.to_owned(), path: integrations.preview_path }))
+    }
+
+    /// Whether the panel may open links of this target in a new tab (an action's `open`): an
+    /// `https://` site whose host is an ASCII name, an IPv4 or a bracketed IPv6 address. The
+    /// public site URL may also be `http://localhost` (development), which the panel never
+    /// opens.
+    pub fn opens_in_panel(&self) -> bool {
+        let Some(scheme) = self.frontend.get(..8) else { return false };
+        if !scheme.eq_ignore_ascii_case("https://") {
+            return false;
+        }
+        let authority = self.frontend[8..].split(['/', '?', '#']).next().unwrap_or_default();
+        !authority.is_empty()
+            && !authority.starts_with([':', '.', '-'])
+            && authority.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b':' | b'[' | b']'))
+    }
+}
+
+/// Issues a preview link of `kind` `id` to `target` for the user of `ctx`, in `txn`: a token
+/// ([`issue`]) and its audit entry, written with the caller's transaction. The caller has
+/// checked that the user may view the record.
+pub async fn issue_link_in(
+    ctx: &rustcms::admin::Ctx,
+    txn: &sea_orm::DatabaseTransaction,
+    target: &Target,
+    kind: crate::services::content::Kind,
+    id: i64,
+) -> rustcms::AppResult<PreviewLink> {
+    use crate::services::content::Kind;
+
+    let me: i64 = ctx.principal.id.parse().map_err(|_| rustcms::AppError::Forbidden)?;
+    let subject = match kind {
+        Kind::Post => PreviewSubject::Post(id),
+        Kind::Page => PreviewSubject::Page(id),
+    };
+    let token = issue(txn, subject, me).await?;
+    rustcms::audit::record(
+        txn,
+        &ctx.audit_context,
+        rustcms::audit::AuditEntry::new("preview_link.created", kind.resource()).key(id),
+    )
+    .await?;
+    Ok(PreviewLink {
+        url: preview_url(&target.frontend, &target.path, &token),
+        expires_at: DateTimeUtc::from(SystemTime::now() + LIFETIME),
+    })
+}
+
+/// A preview link for post or page `key`, made by the user of `ctx` (the preview card of the
+/// record pages, `POST …/previews/{posts|pages}/{id}`):
 ///
 /// - the record is read as the panel reads it for this user (`Ctx::record`: the resource's
 ///   admission, scope and `view` policy; 403 or 404 otherwise, a trashed one is 404);
 /// - `None` while Settings → General has no public site URL (no token is made);
-/// - otherwise a token ([`issue`], audited), and
+/// - otherwise [`issue_link_in`], in its own transaction:
 ///   `{frontend_url}{preview_path}?token={token}` (Settings → Integrations' preview path).
+///
+/// The records' Preview action (`admin::resources::content::preview_action`) calls
+/// [`issue_link_in`] too, in the action's transaction.
 pub async fn issue_link(
     app: &rustcms::AppState,
     ctx: &rustcms::admin::Ctx,
     kind: crate::services::content::Kind,
     key: &str,
 ) -> rustcms::AppResult<Option<PreviewLink>> {
-    use crate::services::content::Kind;
-    use crate::settings::general_settings::GeneralSettings;
-    use crate::settings::integration_settings::IntegrationSettings;
-
     ctx.record(kind.resource(), key).await?;
     let id: i64 = key.parse().map_err(|_| rustcms::AppError::NotFound)?;
-    let general = rustcms::settings::get::<GeneralSettings>(app).await?;
-    let Some(frontend) = general.frontend_url() else { return Ok(None) };
-    let integrations = rustcms::settings::get::<IntegrationSettings>(app).await?;
-    let me: i64 = ctx.principal.id.parse().map_err(|_| rustcms::AppError::Forbidden)?;
-    let subject = match kind {
-        Kind::Post => PreviewSubject::Post(id),
-        Kind::Page => PreviewSubject::Page(id),
-    };
     let txn = rustcms::db::begin_write(app.db()).await?;
-    let token = issue(&txn, subject, me).await?;
-    rustcms::audit::record(
-        &txn,
-        &ctx.audit_context,
-        rustcms::audit::AuditEntry::new("preview_link.created", kind.resource()).key(id),
-    )
-    .await?;
+    let Some(target) = Target::load(&txn, app.keyring()).await? else {
+        txn.rollback().await?;
+        return Ok(None);
+    };
+    let link = issue_link_in(ctx, &txn, &target, kind, id).await?;
     txn.commit().await?;
-    Ok(Some(PreviewLink {
-        url: preview_url(frontend, &integrations.preview_path, &token),
-        expires_at: DateTimeUtc::from(SystemTime::now() + LIFETIME),
-    }))
+    Ok(Some(link))
 }
 
 /// `{frontend}{path}` with `token=` added to its query: after a query the path already has

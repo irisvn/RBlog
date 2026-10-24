@@ -67,7 +67,11 @@ impl Resource for PageRevisionResource {
 
     fn table() -> Table {
         Table::new()
-            .columns(vec![DateColumn::make("created_at"), TextColumn::make("title"), TextColumn::make("author_id")])
+            .columns(vec![
+                DateColumn::make("created_at"),
+                TextColumn::make("title"),
+                TextColumn::make("author_id").hide_below(Breakpoint::Md),
+            ])
             .default_sort("-created_at")
     }
 
@@ -85,6 +89,8 @@ impl Resource for PageRevisionResource {
             })
             .label("Restore this version")
             .icon("rotate-ccw")
+            // The one labelled action of each row of the Revisions table.
+            .primary()
             .requires_confirmation(
                 "Restore this version? The page's content is replaced by it; its status does not change.",
             ),

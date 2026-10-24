@@ -90,9 +90,9 @@ impl Resource for PageResource {
             .columns(vec![
                 TextColumn::make("title"),
                 TextColumn::make("status").cell("rblog/content-status"),
-                TextColumn::make("author_id"),
-                DateColumn::make("published_at"),
-                DateColumn::make("updated_at"),
+                TextColumn::make("author_id").hide_below(Breakpoint::Md),
+                DateColumn::make("published_at").hide_below(Breakpoint::Sm),
+                DateColumn::make("updated_at").hide_below(Breakpoint::Lg),
             ])
             .filters(vec![SelectFilter::make("status").options(STATUS_OPTIONS), SelectFilter::make("author_id")])
             .default_sort("-updated_at")
@@ -103,7 +103,9 @@ impl Resource for PageResource {
     }
 
     fn actions() -> Vec<Action<page::Entity>> {
-        content::workflow_actions(Kind::Page)
+        let mut actions = content::workflow_actions(Kind::Page);
+        actions.push(content::preview_action(Kind::Page));
+        actions
     }
 
     fn policy() -> Arc<dyn Policy> {

@@ -1,4 +1,4 @@
-//! The publishing workflow of posts and pages: the **only** code that changes `status` and
+//! The publi    if !transition.applies(row.status()) {hing workflow of posts and pages: the **only** code that changes `status` and
 //! `published_at` (both guarded: forms never write them).
 //!
 //! | Transition | From | To | Who |
@@ -8,6 +8,10 @@
 //! | [`Transition::Schedule`] | draft, pending, scheduled | scheduled, `published_at` = the time (future) | as Publish |
 //! | [`Transition::Unpublish`] | published, scheduled | draft, no `published_at` | `posts.unpublish` / `pages.unpublish`, and its author unless `posts.edit_others` |
 //! | [`publish_due`] | scheduled and due | published | the scheduler (system) |
+//!
+//! Which states a transition leaves is [`Transition::applies`], the one rule: the post and page
+//! resources offer each workflow action only where it applies (`visible_when`), and
+//! [`transition`] refuses it elsewhere.
 //!
 //! Each transition locks the row, checks it is not trashed, the transition and the actor's
 //! permission ([`crate::policies::content::allows`], the policy's rule), writes the status and
@@ -52,6 +56,12 @@ impl Transition {
         }
     }
 
+    /// Whether it applies to a post or page in `status`: the one rule of which transitions a
+    /// record offers (the resources' `visible_when`) and accepts ([`transition`]).
+    pub fn applies(self, status: Option<PostStatus>) -> bool {
+        status.is_some_and(|s| self.from().contains(&s))
+    }
+
     /// The states it leaves.
     fn from(self) -> &'static [PostStatus] {
         match self {
@@ -87,8 +97,7 @@ pub async fn transition(
     if !rules::allows(ctx, kind, "view", Some(&Facts::of(&row))) {
         return Err(AppError::NotFound);
     }
-    let status = row.status();
-    if !status.is_some_and(|s| transition.from().contains(&s)) {
+    if !transition.applies(row.status()) {
         return Err(content::form_error(ctx.t(NOT_FROM_THIS_STATUS)).into());
     }
     if !rules::allows(ctx, kind, transition.ability(), Some(&Facts::of(&row))) {

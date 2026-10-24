@@ -10,8 +10,9 @@ use serde_json::Value;
 
 use super::{instant, text, translated};
 use crate::models::post::PostStatus;
-use crate::services::content::{Content, Kind};
+use crate::services::content::{self, Content, Kind};
 use crate::services::content_sync::{self, Change};
+use crate::services::preview;
 use crate::services::publishing::{self, Transition};
 use crate::services::taxonomy::{self, Taxonomy};
 
@@ -132,13 +133,33 @@ pub async fn saved(ctx: &Ctx, txn: &DatabaseTransaction, content: Content) -> Ap
     content_sync::content_changed(txn, content.kind, content.id, change, content_sync::actor_id(ctx)).await
 }
 
-/// The workflow actions of a post or page resource: Submit for review, Publish (also on a
-/// selection), Schedule…, Unpublish. Each is offered on the records its ability allows (the
-/// policy checks the permission, the author and the status) and runs `services::publishing`.
+/// What the workflow actions read of a post or page row: its status.
+pub trait Workflow {
+    fn workflow_status(&self) -> Option<PostStatus>;
+}
+
+impl Workflow for crate::models::post::Model {
+    fn workflow_status(&self) -> Option<PostStatus> {
+        self.status()
+    }
+}
+
+impl Workflow for crate::models::page::Model {
+    fn workflow_status(&self) -> Option<PostStatus> {
+        self.status()
+    }
+}
+
+/// The workflow actions of a post or page resource, in their menu order: Publish (the row's
+/// labelled action, also on a selection), Submit for review, Schedule…, then Unpublish (last,
+/// after the separator). Each row offers only the transitions that apply to its status
+/// (`visible_when` with [`Transition::applies`], so a run on one record it does not apply to is
+/// a 403), and only where the policy allows it (the permission, the author, a contributor's
+/// limits); running one goes through `services::publishing`, which checks both again.
 pub fn workflow_actions<E>(kind: Kind) -> Vec<Action<E>>
 where
     E: EntityTrait,
-    E::Model: Into<Content>,
+    E::Model: Into<Content> + Workflow,
 {
     let resource = kind.resource();
     let run = move |name: &'static str, transition: fn(&Data) -> Result<Transition, ValidationErrors>| {
@@ -155,21 +176,80 @@ where
             })
         })
     };
+    // Schedule leaves the states Publish leaves (a scheduled one is rescheduled).
+    let applies =
+        |transition: Transition| move |_: &Ctx, record: &E::Model| transition.applies(record.workflow_status());
     vec![
-        run("submit", |_| Ok(Transition::Submit)).label("Submit for review").icon("send"),
         run("publish", |_| Ok(Transition::Publish))
             .label("Publish")
             .icon("globe")
+            .primary()
             .bulk()
+            .visible_when(applies(Transition::Publish))
             .requires_confirmation("Publish now? It goes live on the public site."),
-        run("schedule", schedule_at).ability("publish").label("Schedule…").icon("calendar-clock").form(vec![
-            ActionField::datetime("at").label("Publish at").help("Times are in UTC (Vietnam is UTC+7)").required(),
-        ]),
+        run("submit", |_| Ok(Transition::Submit))
+            .label("Submit for review")
+            .icon("send")
+            .visible_when(applies(Transition::Submit)),
+        run("schedule", schedule_at)
+            .ability("publish")
+            .label("Schedule…")
+            .icon("calendar-clock")
+            .visible_when(applies(Transition::Publish))
+            .submit_label("Schedule")
+            .form(vec![
+                ActionField::datetime("at").label("Publish at").help("Times are in UTC (Vietnam is UTC+7)").required(),
+            ]),
         run("unpublish", |_| Ok(Transition::Unpublish))
             .label("Unpublish")
             .icon("eye-off")
+            .destructive()
+            .visible_when(applies(Transition::Unpublish))
             .requires_confirmation("Unpublish? It is removed from the public site and goes back to drafts."),
     ]
+}
+
+/// Messages of the Preview action (translated when shown).
+pub const PREVIEW_OPENS: &str = "The preview opens in a new tab. The link works for one hour.";
+pub const PREVIEW_NEEDS_SITE: &str = "Set the public site URL in Settings → General to preview.";
+pub const PREVIEW_NOT_HTTPS: &str =
+    "The public site URL is not https, so the panel does not open it: use Get preview link on this page.";
+pub const PREVIEW_ONE_AT_A_TIME: &str = "Preview one at a time.";
+
+/// "Preview" on a post or page row and record page: opens the public site's preview of it in a
+/// new tab, with a fresh link (`services::preview::issue_link_in`, as the record page's preview
+/// card, which also shows the link to copy and its expiry). One record at a time; it needs
+/// `posts.view` / `pages.view` and a record the user sees (`scope()`, the `view` policy). Without
+/// a public site URL, or with one the panel does not open (`http://localhost`), it says so and
+/// makes no token.
+pub fn preview_action<E>(kind: Kind) -> Action<E>
+where
+    E: EntityTrait,
+    E::Model: Into<Content>,
+{
+    let permission = match kind {
+        Kind::Post => "posts.view",
+        Kind::Page => "pages.view",
+    };
+    Action::<E>::with_outcome("preview", move |ctx, txn, records, _data| {
+        Box::pin(async move {
+            let [record] =
+                <[E::Model; 1]>::try_from(records).map_err(|_| content::form_error(ctx.t(PREVIEW_ONE_AT_A_TIME)))?;
+            let content: Content = record.into();
+            let Some(target) = preview::Target::load(txn, ctx.keyring()?).await? else {
+                return Ok(ActionOutcome::message(ctx.t(PREVIEW_NEEDS_SITE)));
+            };
+            if !target.opens_in_panel() {
+                return Ok(ActionOutcome::message(ctx.t(PREVIEW_NOT_HTTPS)));
+            }
+            let link = preview::issue_link_in(ctx, txn, &target, kind, content.id).await?;
+            Ok(ActionOutcome::open(link.url).with_message(ctx.t(PREVIEW_OPENS)))
+        })
+    })
+    .ability("view")
+    .requires_permission(permission)
+    .label("Preview")
+    .icon("external-link")
 }
 
 /// The `at` of the Schedule dialog (canonical UTC RFC 3339).

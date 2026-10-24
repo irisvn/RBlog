@@ -54,8 +54,8 @@ db_test!(a_contributor_writes_drafts_only, migrate = Migrator, |db: TestDb| asyn
     run(&app, &contributor, "posts", "submit", &key, None).await;
     assert_eq!(post_row(app.state().db(), &key).await.status, "pending");
     update(&app, &contributor, "posts", &key, json!({"excerpt": "Tóm tắt 2"})).await.assert_status(StatusCode::OK);
-    // A pending post is not submitted again.
-    action(&app, &contributor, "posts", "submit", &[&key], None).await.assert_json("/denied", json!([key]));
+    // A pending post is not submitted again: not offered, and refused on that record.
+    action(&app, &contributor, "posts", "submit", &[&key], None).await.assert_status(StatusCode::FORBIDDEN);
     // Pending: not trashed (only drafts).
     contributor
         .send(Method::DELETE, &records(&app, "posts", Some(&key)), None)
@@ -152,11 +152,12 @@ db_test!(transitions_apply_from_their_states_only, migrate = Migrator, |db: Test
             }
         };
         let key = create(&app, &editor, slug, json!({"title": format!("Bài {slug}")})).await;
-        // A draft is neither unpublished nor (once pending) submitted again.
-        action(&app, &editor, slug, "unpublish", &[&key], None).await.assert_json("/denied", json!([key]));
+        // A draft is neither unpublished nor (once pending) submitted again: the actions are
+        // hidden on it (`visible_when`), so a run on it alone is a 403.
+        action(&app, &editor, slug, "unpublish", &[&key], None).await.assert_status(StatusCode::FORBIDDEN);
         run(&app, &editor, slug, "submit", &key, None).await;
         assert_eq!(row(key.clone()).await.0, "pending");
-        action(&app, &editor, slug, "submit", &[&key], None).await.assert_json("/denied", json!([key]));
+        action(&app, &editor, slug, "submit", &[&key], None).await.assert_status(StatusCode::FORBIDDEN);
         // A schedule in the past is refused on the field; in the future it holds.
         let past = action(&app, &editor, slug, "schedule", &[&key], Some(json!({"at": "2020-01-01T00:00:00Z"}))).await;
         past.assert_validation_error("at");
@@ -172,11 +173,11 @@ db_test!(transitions_apply_from_their_states_only, migrate = Migrator, |db: Test
         assert!(at.unwrap() <= rblog::services::content_sync::now());
         // Published: not published or scheduled again, not submitted; unpublished to a draft.
         for name in ["publish", "submit"] {
-            action(&app, &editor, slug, name, &[&key], None).await.assert_json("/denied", json!([key]));
+            action(&app, &editor, slug, name, &[&key], None).await.assert_status(StatusCode::FORBIDDEN);
         }
         action(&app, &editor, slug, "schedule", &[&key], Some(json!({"at": future(1)})))
             .await
-            .assert_json("/denied", json!([key]));
+            .assert_status(StatusCode::FORBIDDEN);
         run(&app, &editor, slug, "unpublish", &key, None).await;
         assert_eq!(row(key.clone()).await, ("draft".to_owned(), None));
         // A scheduled one can be unpublished too.
@@ -468,4 +469,113 @@ db_test!(authors_names_are_shown_to_whom_sees_their_posts, migrate = Migrator, |
     // Tags accept the links widget's page size.
     let tags = editor.get(&format!("{}?per_page=100", records(&app, "tags", None))).await;
     tags.assert_status(StatusCode::OK).assert_json("/meta/perPage", json!(100));
+});
+
+/// The workflow actions each row offers (its `abilities`), by status.
+const OFFERED: [(&str, [(&str, bool); 4]); 4] = [
+    ("draft", [("submit", true), ("publish", true), ("schedule", true), ("unpublish", false)]),
+    ("pending", [("submit", false), ("publish", true), ("schedule", true), ("unpublish", false)]),
+    ("scheduled", [("submit", false), ("publish", true), ("schedule", true), ("unpublish", true)]),
+    ("published", [("submit", false), ("publish", false), ("schedule", false), ("unpublish", true)]),
+];
+
+db_test!(rows_offer_only_the_transitions_that_apply, migrate = Migrator, |db: TestDb| async move {
+    let app = content::app(db).await;
+    let db = app.state().db();
+    let (editor, _) = signed_in(&app, "Biên", EDITOR_ROLE).await;
+    for slug in ["posts", "pages"] {
+        let status_of = |key: String| async move {
+            match slug {
+                "posts" => post_row(db, &key).await.status,
+                _ => page_row(db, &key).await.status,
+            }
+        };
+        // One record in each status.
+        let mut keys = Vec::new();
+        for (status, _) in OFFERED {
+            let key = create(&app, &editor, slug, json!({"title": format!("{slug} {status}")})).await;
+            match status {
+                "pending" => run(&app, &editor, slug, "submit", &key, None).await,
+                "scheduled" => run(&app, &editor, slug, "schedule", &key, Some(json!({"at": future(2)}))).await,
+                "published" => run(&app, &editor, slug, "publish", &key, None).await,
+                _ => {}
+            }
+            assert_eq!(status_of(key.clone()).await, status);
+            keys.push(key);
+        }
+        // The list says, row by row, which actions apply (and the record page the same).
+        let listed = editor.get(&records(&app, slug, None)).await.json();
+        for ((status, offered), key) in OFFERED.iter().zip(&keys) {
+            let row = listed["data"].as_array().unwrap().iter().find(|r| r["key"] == json!(key)).expect("listed");
+            let read = editor.get(&records(&app, slug, Some(key))).await.json();
+            for (action, expected) in offered {
+                assert_eq!(row["abilities"][action], json!(expected), "{slug} {status} {action}");
+                assert_eq!(read["data"]["abilities"][action], json!(expected), "{slug} {status} {action}");
+            }
+            assert_eq!(row["abilities"]["preview"], json!(true), "{slug} {status} preview");
+        }
+        // A transition hidden on a record is refused on it alone (403), and nothing changes.
+        for ((status, offered), key) in OFFERED.iter().zip(&keys) {
+            for (name, _) in offered.iter().filter(|(_, offered)| !offered) {
+                let data = (*name == "schedule").then(|| json!({"at": future(4)}));
+                let refused = action(&app, &editor, slug, name, &[key], data).await;
+                assert_eq!(refused.status, StatusCode::FORBIDDEN, "{slug} {status} {name}: {}", refused.text());
+                assert_eq!(status_of(key.clone()).await, *status, "{slug} {status} {name}");
+            }
+        }
+        // On a selection, Publish skips the records it does not apply to.
+        let done = action(&app, &editor, slug, "publish", &[&keys[0], &keys[3]], None).await;
+        done.assert_status(StatusCode::OK)
+            .assert_json("/processed", json!([keys[0]]))
+            .assert_json("/denied", json!([keys[3]]));
+    }
+});
+
+db_test!(the_lists_place_their_actions_and_columns, migrate = Migrator, |db: TestDb| async move {
+    let app = content::app(db).await;
+    let (editor, me) = signed_in(&app, "Biên", EDITOR_ROLE).await;
+    for slug in ["posts", "pages"] {
+        let schema = editor.get(&app.admin_api(&format!("resources/{slug}/schema"))).await;
+        schema.assert_status(StatusCode::OK);
+        let schema = schema.json();
+        let actions = schema["table"]["actions"].as_array().unwrap();
+        let names: Vec<&str> = actions.iter().map(|a| a["name"].as_str().unwrap()).collect();
+        assert_eq!(names, ["publish", "submit", "schedule", "unpublish", "preview"], "{slug}");
+        let find = |name: &str| actions.iter().find(|a| a["name"] == json!(name)).unwrap().clone();
+        // Publish is the row's labelled action; the others are in its menu, Unpublish last.
+        assert_eq!(find("publish")["primary"], json!(true), "{slug}");
+        assert_eq!(find("publish")["bulk"], json!(true), "{slug}");
+        for name in ["submit", "schedule", "unpublish", "preview"] {
+            assert_eq!(find(name).get("primary"), None, "{slug} {name}");
+        }
+        assert_eq!(find("unpublish")["color"], json!("danger"), "{slug}");
+        assert_eq!(find("schedule")["submitLabel"], json!("Schedule"), "{slug}");
+        // The title keeps the room on a phone.
+        let columns = schema["table"]["columns"].as_array().unwrap();
+        let hidden: Vec<(&str, Option<&str>)> =
+            columns.iter().map(|c| (c["name"].as_str().unwrap(), c["hideBelow"].as_str())).collect();
+        let expected: &[(&str, Option<&str>)] = match slug {
+            "posts" => &[
+                ("title", None),
+                ("status", None),
+                ("category_id", Some("md")),
+                ("author_id", Some("md")),
+                ("published_at", Some("sm")),
+            ],
+            _ => &[
+                ("title", None),
+                ("status", None),
+                ("author_id", Some("md")),
+                ("published_at", Some("sm")),
+                ("updated_at", Some("lg")),
+            ],
+        };
+        assert_eq!(hidden, expected, "{slug}");
+    }
+    // In Vietnamese, Schedule's dialog button reads "Hẹn giờ".
+    let vi = app.acting_as(&me).await.languages("vi");
+    let schema = vi.get(&app.admin_api("resources/posts/schema")).await.json();
+    let actions = schema["table"]["actions"].as_array().unwrap();
+    let schedule = actions.iter().find(|a| a["name"] == json!("schedule")).unwrap();
+    assert_eq!(schedule["submitLabel"], json!("Hẹn giờ"));
 });

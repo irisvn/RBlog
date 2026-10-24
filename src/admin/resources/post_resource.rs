@@ -97,9 +97,9 @@ impl Resource for PostResource {
             .columns(vec![
                 TextColumn::make("title"),
                 TextColumn::make("status").cell("rblog/content-status"),
-                TextColumn::make("category_id"),
-                TextColumn::make("author_id"),
-                DateColumn::make("published_at"),
+                TextColumn::make("category_id").hide_below(Breakpoint::Md),
+                TextColumn::make("author_id").hide_below(Breakpoint::Md),
+                DateColumn::make("published_at").hide_below(Breakpoint::Sm),
             ])
             .filters(vec![
                 SelectFilter::make("status").options(STATUS_OPTIONS),
@@ -108,7 +108,8 @@ impl Resource for PostResource {
                 TernaryFilter::make("featured"),
             ])
             // Last updated first. No `updated_at` column: the title needs the room (six columns and
-            // the workflow actions do not fit beside the sidebar).
+            // the row's actions do not fit beside the sidebar). Under 768 px only the title, the
+            // status and the publish date stay; on a phone, the title and the status.
             .default_sort("-updated_at")
     }
 
@@ -120,7 +121,9 @@ impl Resource for PostResource {
     }
 
     fn actions() -> Vec<Action<post::Entity>> {
-        content::workflow_actions(Kind::Post)
+        let mut actions = content::workflow_actions(Kind::Post);
+        actions.push(content::preview_action(Kind::Post));
+        actions
     }
 
     fn policy() -> Arc<dyn Policy> {

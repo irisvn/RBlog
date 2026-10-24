@@ -49,7 +49,9 @@ impl Resource for MenuResource {
     }
 
     fn table() -> Table {
-        Table::new().columns(vec![TextColumn::make("name"), TextColumn::make("key")]).default_sort("name")
+        Table::new()
+            .columns(vec![TextColumn::make("name"), TextColumn::make("key").hide_below(Breakpoint::Sm)])
+            .default_sort("name")
     }
 
     fn relations() -> Vec<Relation> {

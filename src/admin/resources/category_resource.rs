@@ -49,7 +49,11 @@ impl Resource for CategoryResource {
 
     fn table() -> Table {
         Table::new()
-            .columns(vec![TextColumn::make("name"), TextColumn::make("slug"), DateColumn::make("created_at")])
+            .columns(vec![
+                TextColumn::make("name"),
+                TextColumn::make("slug").hide_below(Breakpoint::Sm),
+                DateColumn::make("created_at").hide_below(Breakpoint::Md),
+            ])
             .default_sort("name")
     }
 

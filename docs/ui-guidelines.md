@@ -180,6 +180,13 @@ with `sm` buttons. Its `aria-label` names the target ("Delete image cover.jpg").
 - Show an action only when it applies to the current state: `Publish` for a draft, `Unpublish`
   for a published post.
 - A row shows at most two actions. Anything more goes into a `⋯` menu (`RowActions`).
+- In generated lists and record pages (RustCMS 0.10.1), the server decides which actions a row
+  offers: declare each with `visible_when` from the rule that owns its state (posts:
+  `publishing::Transition::applies`), mark the one frequent action `.primary()` (Publish), and
+  `.destructive()` the ones that take something away from readers (Unpublish). RustCMS draws the
+  primary one labelled and the rest in the row's `⋯` menu, destructive ones last after a
+  separator; View, Edit and Delete keep their icon buttons. A form dialog's button names the
+  action without the ellipsis (`.submit_label("Schedule")`).
   Destructive items go last in that menu, after a separator, marked `destructive`.
 - Links that look like buttons use `buttonVariants()`, never a hand-made class.
 

@@ -74,8 +74,8 @@ impl Resource for MenuItemResource {
                 TextColumn::make("label"),
                 // The option's label, not the stored value (docs/ui-guidelines.md §4).
                 TextColumn::make("kind").cell("rblog/option-label").props(option_labels(&KIND_OPTIONS)),
-                TextColumn::make("parent_id"),
-                TextColumn::make("position"),
+                TextColumn::make("parent_id").hide_below(Breakpoint::Md),
+                TextColumn::make("position").hide_below(Breakpoint::Sm),
             ])
             .filters(vec![SelectFilter::make("kind").options(KIND_OPTIONS), SelectFilter::make("parent_id")])
             .default_sort("position")

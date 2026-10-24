@@ -12,9 +12,11 @@
 //      Integrations → Webhook URL/secret at a tiny local server this script starts; issues a
 //      Content API key;
 //   2. the Contributor writes a draft, gets a preview link from the preview slot, and opens it:
-//      the local "frontend" asks RBlog's /api/v1/preview for it, as a real one would;
-//   3. the Contributor submits it for review, and sees no Publish action (and the server refuses it);
-//   4. the Editor publishes it from the list (selection bar);
+//      the local "frontend" asks RBlog's /api/v1/preview for it, as a real one would; the row's
+//      Preview action says why it does not open an http site itself;
+//   3. the Contributor submits it for review from the row's ⋯ menu, and sees no Publish action
+//      (and the server refuses it);
+//   4. the Editor publishes it from its row (Publish, the row's labelled action);
 //   5. the Content API returns it with the key;
 //   6. the local receiver gets a `post.published` webhook whose signature checks out
 //      (docs/frontend-integration.html, "Webhook").
@@ -197,6 +199,12 @@ async function runAction(page, name, click) {
   check(response.ok(), `the ${name} action: HTTP ${response.status()} ${(await response.text()).slice(0, 200)}`);
 }
 
+/** Opens the ⋯ menu of `row` and chooses `item`. */
+async function fromMenu(page, row, item) {
+  await row.getByRole("button", { name: /^More actions for / }).click();
+  await page.getByRole("menuitem", { name: item }).click();
+}
+
 /** The row of the post in the list (searched by its title). */
 async function postRow(page) {
   await page.goto(`${admin}/r/posts?search=${encodeURIComponent(TITLE)}`);
@@ -322,7 +330,11 @@ try {
     const last = previews.at(-1);
     check(last?.status === 200 && last.json?.preview?.status === "draft", `preview API: ${JSON.stringify(last).slice(0, 200)}`);
     await tab.close();
-    return `${new URL(href).pathname}?token=… → /api/v1/preview 200, status draft`;
+    // The row's Preview action opens https sites only: this local one gets a message instead.
+    const row = await postRow(contributor);
+    await runAction(contributor, "preview", () => fromMenu(contributor, row, /^Preview$/));
+    await contributor.getByText(/not https/).first().waitFor({ timeout: 5000 });
+    return `${new URL(href).pathname}?token=… → /api/v1/preview 200, status draft; Preview action: not https`;
   });
 
   await step("the Contributor submits it and cannot publish", async () => {
@@ -338,22 +350,24 @@ try {
       check((await contributor.getByRole("button", { name: /^Publish$/ }).count()) === 0, "Publish is offered to the Contributor for a selection");
       await select.uncheck();
     }
-    await runAction(contributor, "submit", () => row.getByRole("button", { name: /^Submit for review$/ }).click());
+    check((await row.getByRole("button", { name: /^Submit for review$/ }).count()) === 0, "Submit for review is not in the ⋯ menu");
+    await runAction(contributor, "submit", () => fromMenu(contributor, row, /^Submit for review$/));
     await until("the pending status", async () => (await (await postRow(contributor)).innerText()).includes("Pending review"), 15000);
     const refused = await api(contributor, "POST", "/resources/posts/actions/publish", { keys: [postId] });
     check(refused.status === 403 || refused.status === 404, `the server let the Contributor publish: HTTP ${refused.status}`);
-    const menu = (await postRow(contributor)).getByRole("button", { name: /^Publish$/ });
-    check((await menu.count()) === 0, "Publish shown after submitting");
+    const pending = await postRow(contributor);
+    check((await pending.getByRole("button", { name: /^Publish$/ }).count()) === 0, "Publish shown after submitting");
+    await pending.getByRole("button", { name: /^More actions for / }).click();
+    check((await contributor.getByRole("menuitem", { name: /^(Publish|Submit for review|Schedule)/ }).count()) === 0, "a transition offered on the pending post");
+    await contributor.keyboard.press("Escape");
     return `pending; publish refused with HTTP ${refused.status}`;
   });
 
   await step("the Editor publishes it", async () => {
     const editor = await signIn(USERS.editor.email, USERS.editor.password);
     const row = await postRow(editor);
-    // Publish is a bulk action, and RustCMS 0.9.0 offers bulk actions only for a selection (not
-    // in the row): select the row, then Publish in the selection bar.
-    await row.getByRole("checkbox").check();
-    await editor.getByRole("button", { name: /^Publish$/ }).first().click();
+    // Publish is the row's labelled action (RustCMS 0.10.1 offers bulk actions on rows too).
+    await row.getByRole("button", { name: /^Publish$/ }).click();
     const dialog = editor.getByRole("alertdialog").or(editor.getByRole("dialog"));
     await dialog.waitFor({ timeout: 5000 });
     await runAction(editor, "publish", () => dialog.getByRole("button", { name: /^(Publish|Confirm|Run)$/ }).last().click());
