@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### RustCMS 0.10.3: page headers on phones
+
+- RustCMS-Core v0.10.3 (no migration, no API change).
+- On a phone, a post or page header shows only its main action and a ⋯ menu; the other actions,
+  then Edit, then Delete (last, after a separator) are in that menu. Wide screens keep every
+  action inline. Titles keep their room: actions wrap below them.
+- View pages show the slug with its prefix (`/posts/…`, `/…`).
+
 ### RustCMS 0.10.2: an editor layout for posts and pages
 
 - RustCMS-Core v0.10.2 (no migration; admin vocabulary 11). RBlog already sets the theme's

@@ -1,6 +1,6 @@
 # Content API
 
-> **Status: implemented, read side (RustCMS 0.10.2).** This page is the contract the Nuxt/Next
+> **Status: implemented, read side (RustCMS 0.10.3).** This page is the contract the Nuxt/Next
 > frontend is built against.
 
 RBlog is the admin and the content source; the public site is a separate Nuxt or Next app that

@@ -1,7 +1,7 @@
 # RBlog
 
 The admin back office of a blog and its read-only Content API, for a separate Nuxt or Next site:
-one Rust binary built on [RustCMS](https://irisvn.github.io/RustCMS/) v0.10.2, on MySQL 8.4 only.
+one Rust binary built on [RustCMS](https://irisvn.github.io/RustCMS/) v0.10.3, on MySQL 8.4 only.
 
 <p align="center"><img src="docs/images/editor.png" width="900" alt="The post editor in Vietnamese: title, slug under it, rich-text body on the left; Publishing, Cover image and Organize in the aside"></p>
 
@@ -62,8 +62,9 @@ one Rust binary built on [RustCMS](https://irisvn.github.io/RustCMS/) v0.10.2, o
   <img src="docs/images/content-api.png" width="800" alt="The Content API page: no keys yet, and how to use a key with curl">
 
 - **Vietnamese and English**, **dark mode**, and phone widths (390 px) without sideways scrolling.
+  On a phone, a record's header keeps its main action and a ⋯ menu with the rest.
 
-  <img src="docs/images/editor-dark.png" width="640" alt="The post editor in dark mode"> <img src="docs/images/mobile-posts.png" width="200" alt="The posts list on a 390 px wide phone">
+  <img src="docs/images/editor-dark.png" width="560" alt="The post editor in dark mode"> <img src="docs/images/mobile-posts.png" width="190" alt="The posts list on a 390 px wide phone"> <img src="docs/images/mobile-header-menu.png" width="190" alt="A post on a 390 px wide phone: Publish and the ⋯ menu open with Submit, Schedule, Preview, Edit and Delete">
 
 - **Webhook** to the frontend on every public change: signed (HMAC-SHA256), delivered at least
   once, with cache tags and old and new paths.

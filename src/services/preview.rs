@@ -1,5 +1,5 @@
 //! Preview tokens: a random token shows one post or page, in any status, through
-//! `GET /api/v1/preview/{token}` until it expires (one hour) or is revoked. The token is the
+//! `GET /api/v1/preview?token=…` until it expires (one hour) or is revoked. The token is the
 //! capability: only its SHA-256 is stored, and only who may view the subject issues one (the
 //! preview card and the Preview action check that before calling [`issue_link_in`]).
 
