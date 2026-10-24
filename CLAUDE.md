@@ -1,7 +1,7 @@
 # RBlog — rules for working on this repository
 
 RBlog is the **admin back office** of a blog, built as a **RustCMS application**: one Rust binary
-(`rblog`, axum on RustCMS-Core v0.10.1) with the RustCMS admin panel embedded. The **only**
+(`rblog`, axum on RustCMS-Core v0.10.2) with the RustCMS admin panel embedded. The **only**
 database is **MySQL 8.4**, in development, tests and CI (`docker-compose.yml`,
 `.cargo/config.toml`). Do not add SQLite or PostgreSQL configuration, files or test runs.
 
