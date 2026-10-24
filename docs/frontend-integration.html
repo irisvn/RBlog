@@ -1,0 +1,693 @@
+<!doctype html>
+<html lang="vi">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RBlog Frontend Guide</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a developer guide. Contents rail on wide screens, one reading column, code blocks scroll in their own frame. */
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --fg: #1b2330;
+  --muted: #5b6678;
+  --line: #dde2ea;
+  --accent: #0f6e8c;
+  --accent-soft: #e3f1f5;
+  --code-bg: #f1f4f8;
+  --warn: #8a5a00;
+  --warn-soft: #fbf1dc;
+  --ok: #1d7a46;
+  --ok-soft: #e2f4ea;
+  --font-body: "Be Vietnam Pro", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11151b; --surface: #181e26; --fg: #e4e8ee; --muted: #9aa5b5; --line: #2a323d;
+    --accent: #5cc3df; --accent-soft: #15303a; --code-bg: #0d1116;
+    --warn: #f0bf5a; --warn-soft: #33290f; --ok: #6fd69a; --ok-soft: #14301f; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11151b; --surface: #181e26; --fg: #e4e8ee; --muted: #9aa5b5; --line: #2a323d;
+  --accent: #5cc3df; --accent-soft: #15303a; --code-bg: #0d1116;
+  --warn: #f0bf5a; --warn-soft: #33290f; --ok: #6fd69a; --ok-soft: #14301f; color-scheme: dark;
+}
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.65; }
+.wrap {
+  max-width: 1180px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 32px 64px;
+  display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 40px;
+}
+@media (max-width: 900px) { .wrap { grid-template-columns: minmax(0, 1fr); gap: 24px; } nav.toc { position: static !important; } }
+nav.toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 24px); align-self: start; font-size: 13px; max-height: calc(100vh - 48px); overflow-y: auto; }
+nav.toc p { margin: 0 0 8px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+nav.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; counter-reset: s; }
+nav.toc li { counter-increment: s; }
+nav.toc a { color: var(--fg); text-decoration: none; display: flex; gap: 8px; padding: 4px 8px; border-radius: 6px; }
+nav.toc a::before { content: counter(s); color: var(--muted); font-family: var(--font-mono); font-size: 11px; min-width: 14px; padding-top: 2px; }
+nav.toc a:hover, nav.toc a:focus-visible { background: var(--accent-soft); color: var(--accent); outline: none; }
+main { min-width: 0; display: grid; gap: 48px; }
+header.hero { display: grid; gap: 12px; }
+.eyebrow { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); font-weight: 600; margin: 0; }
+h1 { font-size: 34px; line-height: 1.2; margin: 0; font-weight: 700; text-wrap: balance; }
+h2 { font-size: 22px; margin: 0; text-wrap: balance; display: flex; gap: 10px; align-items: baseline; }
+h2 .n { font-family: var(--font-mono); font-size: 14px; color: var(--accent); font-weight: 500; }
+h3 { font-size: 16px; margin: 8px 0 0; }
+.lede { margin: 0; color: var(--muted); max-width: 70ch; }
+section { display: grid; gap: 14px; scroll-margin-top: 24px; }
+section > p, section > ul, section > ol { margin: 0; max-width: 72ch; }
+section ul, section ol { padding-left: 20px; display: grid; gap: 4px; }
+code { font-family: var(--font-mono); font-size: .88em; }
+p code, li code, td code { background: var(--accent-soft); padding: 1px 5px; border-radius: 4px; }
+a { color: var(--accent); }
+.arch { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; overflow-x: auto; }
+.arch svg { display: block; min-width: 720px; width: 100%; height: auto; }
+.arch text { font-family: var(--font-body); fill: var(--fg); font-size: 13px; }
+.arch .sm { font-size: 11.5px; fill: var(--muted); }
+.arch .box { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; }
+.arch .box.hl { stroke: var(--accent); }
+.arch .edge { stroke: var(--muted); stroke-width: 1.5; fill: none; }
+.arch .edge.hook { stroke: var(--accent); stroke-dasharray: 5 4; }
+.arch .head { fill: var(--muted); }
+.arch .head.hook { fill: var(--accent); }
+.code { position: relative; background: var(--code-bg); border: 1px solid var(--line); border-radius: var(--radius); min-width: 0; }
+.code .bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 8px 6px 14px; border-bottom: 1px solid var(--line); font-size: 12px; color: var(--muted); font-family: var(--font-mono); }
+.code pre { margin: 0; padding: 12px 14px; overflow-x: auto; font-family: var(--font-mono); font-variant-ligatures: none; font-size: 12.8px; line-height: 1.6; }
+.copy { font: inherit; font-family: var(--font-body); font-size: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 6px; padding: 3px 10px; cursor: pointer; }
+.copy:hover { border-color: var(--accent); color: var(--accent); }
+.copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tabs { display: grid; gap: 0; }
+.tablist { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
+.tablist button { font: inherit; font-size: 13.5px; font-weight: 500; background: none; border: 0; border-bottom: 2px solid transparent; color: var(--muted); padding: 6px 12px; cursor: pointer; margin-bottom: -1px; }
+.tablist button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+.tablist button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 4px; }
+.tabpanel { padding-top: 12px; display: grid; gap: 12px; }
+.note { border-radius: var(--radius); padding: 12px 14px; display: grid; gap: 4px; font-size: 14px; max-width: 80ch; }
+.note b { font-weight: 600; }
+.note.warn { background: var(--warn-soft); color: var(--fg); border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent); }
+.note.warn b { color: var(--warn); }
+.note.ok { background: var(--ok-soft); border: 1px solid color-mix(in srgb, var(--ok) 30%, transparent); }
+.note.ok b { color: var(--ok); }
+.scroll { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th, td { text-align: left; padding: 8px 14px; border-top: 1px solid var(--line); vertical-align: top; }
+thead th { border-top: 0; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+td.m { font-family: var(--font-mono); font-size: 12.8px; white-space: nowrap; }
+.method { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--ok); margin-right: 6px; }
+.steps { display: grid; gap: 10px; counter-reset: st; list-style: none; padding: 0 !important; }
+.steps li { counter-increment: st; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; align-items: start; }
+.steps li::before { content: counter(st); width: 24px; height: 24px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 600; display: grid; place-items: center; }
+.check { list-style: none; padding: 0 !important; display: grid; gap: 6px; }
+.check li { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 6px; }
+.check li::before { content: "☐"; color: var(--accent); }
+footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); padding-top: 16px; }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+
+<div class="wrap">
+  <nav class="toc" aria-label="Mục lục">
+    <p>Mục lục</p>
+    <ol>
+      <li><a href="#kien-truc">Kiến trúc</a></li>
+      <li><a href="#bat-dau">Bắt đầu</a></li>
+      <li><a href="#goi-api">Gọi Content API</a></li>
+      <li><a href="#endpoint">Danh sách endpoint</a></li>
+      <li><a href="#bai-viet">Trang bài viết</a></li>
+      <li><a href="#danh-sach">Danh sách và lọc</a></li>
+      <li><a href="#anh">Ảnh</a></li>
+      <li><a href="#menu-settings">Menu và cài đặt site</a></li>
+      <li><a href="#webhook">Webhook làm mới cache</a></li>
+      <li><a href="#preview">Xem trước bản nháp</a></li>
+      <li><a href="#sitemap">Sitemap và SEO</a></li>
+      <li><a href="#loi">Xử lý lỗi</a></li>
+      <li><a href="#checklist">Checklist trước khi chạy thật</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <header class="hero">
+      <p class="eyebrow">Tài liệu tích hợp</p>
+      <h1>Kết nối frontend Nuxt hoặc Next với RBlog</h1>
+      <p class="lede">RBlog là trang quản trị và là nguồn nội dung. Trang công khai là một app Nuxt hoặc Next riêng, đọc nội dung qua <strong>Content API chỉ đọc</strong> từ phía server, và được RBlog báo qua <strong>webhook</strong> mỗi khi nội dung thay đổi để làm mới cache. Tài liệu này đi từ lúc lấy key tới lúc chạy thật, kèm code mẫu cho cả hai framework.</p>
+    </header>
+
+    <section id="kien-truc" aria-labelledby="h-kien-truc">
+      <h2 id="h-kien-truc"><span class="n">01</span>Kiến trúc</h2>
+      <div class="arch" role="img" aria-label="Sơ đồ: trình duyệt gọi frontend; server frontend gọi Content API của RBlog bằng key; trình duyệt tải ảnh trực tiếp từ RBlog; RBlog gửi webhook về frontend khi nội dung đổi.">
+        <svg viewBox="0 0 760 250" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="head" d="M0,0 L10,5 L0,10 z"/></marker>
+            <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="head hook" d="M0,0 L10,5 L0,10 z"/></marker>
+          </defs>
+          <rect class="box" x="10" y="80" width="150" height="70" rx="10"/>
+          <text x="85" y="110" text-anchor="middle">Trình duyệt</text>
+          <text x="85" y="130" text-anchor="middle" class="sm">người đọc</text>
+
+          <rect class="box hl" x="290" y="80" width="180" height="70" rx="10"/>
+          <text x="380" y="108" text-anchor="middle">Frontend</text>
+          <text x="380" y="128" text-anchor="middle" class="sm">Nuxt / Next (SSR, ISR)</text>
+
+          <rect class="box" x="590" y="80" width="160" height="70" rx="10"/>
+          <text x="670" y="108" text-anchor="middle">RBlog</text>
+          <text x="670" y="128" text-anchor="middle" class="sm">admin + Content API</text>
+
+          <path class="edge" d="M160,115 L286,115" marker-end="url(#a)"/>
+          <text x="223" y="105" text-anchor="middle" class="sm">HTML</text>
+
+          <path class="edge" d="M470,105 L586,105" marker-end="url(#a)"/>
+          <text x="528" y="95" text-anchor="middle" class="sm">Bearer key</text>
+
+          <path class="edge hook" d="M590,135 L474,135" marker-end="url(#ah)"/>
+          <text x="532" y="155" text-anchor="middle" class="sm">webhook (ký HMAC)</text>
+
+          <path class="edge" d="M85,150 C85,225 670,225 670,154" marker-end="url(#a)"/>
+          <text x="380" y="215" text-anchor="middle" class="sm">ảnh: /api/v1/media/… (không cần key, nên đặt CDN phía trước)</text>
+
+          <text x="380" y="40" text-anchor="middle" class="sm">Key chỉ nằm trên server frontend, không bao giờ xuống trình duyệt</text>
+          <path class="edge" d="M380,48 L380,76" marker-end="url(#a)"/>
+        </svg>
+      </div>
+      <ul>
+        <li><strong>Chỉ đọc, chỉ nội dung đã đăng.</strong> API không bao giờ trả bản nháp, bài hẹn giờ chưa tới giờ hay bài trong thùng rác, kể cả khi hỏi bằng slug cũ. Bản nháp chỉ xem được qua link preview.</li>
+        <li><strong>Gọi từ server.</strong> RBlog không bật CORS. Mọi request mang key phải đi từ server của frontend (SSR, route handler, server API).</li>
+        <li><strong>Cache ở frontend, làm mới bằng webhook.</strong> Frontend cache câu trả lời theo tag; RBlog báo tag nào cần làm mới. Thêm thời gian hết hạn dự phòng (ví dụ 10 phút) cho trường hợp webhook lỗi.</li>
+      </ul>
+    </section>
+
+    <section id="bat-dau" aria-labelledby="h-bat-dau">
+      <h2 id="h-bat-dau"><span class="n">02</span>Bắt đầu</h2>
+      <ol class="steps">
+        <li><div><strong>Tạo Content API key.</strong> Trong RBlog, vào <em>Tích hợp → Content API</em> (<code>/admin/p/content-api</code>), bấm <em>Tạo khoá</em>, đặt tên (ví dụ "Next production") và chọn thời hạn. Key chỉ hiện một lần: copy ngay. Cần quyền <code>integrations.manage</code>.</div></li>
+        <li><div><strong>Cấu hình webhook.</strong> Vào <em>Cài đặt → Tích hợp</em>, nhập URL nhận webhook của frontend (bắt buộc <code>https://</code>) và một secret ngẫu nhiên dài (ví dụ <code>openssl rand -hex 32</code>).</div></li>
+        <li><div><strong>Khai báo URL frontend.</strong> Vào <em>Cài đặt → Chung</em>, nhập URL công khai của site. Ở <em>Cài đặt → Tích hợp</em>, kiểm tra đường dẫn preview (mặc định <code>/preview</code>).</div></li>
+        <li><div><strong>Đặt biến môi trường cho frontend</strong> như bên dưới, chỉ ở phía server.</div></li>
+      </ol>
+      <div class="code"><div class="bar"><span>.env (frontend)</span><button class="copy" type="button">Copy</button></div><pre><code>RBLOG_URL=https://cms.example.com          # APP_URL của RBlog, không có dấu / ở cuối
+RBLOG_CONTENT_KEY=rcms_45_xxxxxxxxxxxxxxxx  # Content API key, chỉ dùng phía server
+RBLOG_WEBHOOK_SECRET=…                      # giống secret trong Cài đặt → Tích hợp</code></pre></div>
+      <div class="note warn"><b>Không đưa key xuống trình duyệt</b> Ở Next, đừng đặt tên biến bắt đầu bằng <code>NEXT_PUBLIC_</code>. Ở Nuxt, để key trong <code>runtimeConfig</code> gốc, không đặt trong <code>runtimeConfig.public</code>.</div>
+    </section>
+
+    <section id="goi-api" aria-labelledby="h-goi-api">
+      <h2 id="h-goi-api"><span class="n">03</span>Gọi Content API</h2>
+      <p>Tất cả endpoint nằm dưới <code>/api/v1/content</code>, trả JSON. Id và số 64-bit đi dưới dạng chuỗi; thời điểm là RFC 3339 giờ UTC (<code>2026-10-24T08:00:00Z</code>). Viết một hàm gọi dùng chung, gắn key và tag cache ở một chỗ.</p>
+      <div class="tabs" data-tabs>
+        <div class="tablist" role="tablist" aria-label="Framework">
+          <button role="tab" id="t-next-1" aria-controls="p-next-1" aria-selected="true">Next.js (App Router)</button>
+          <button role="tab" id="t-nuxt-1" aria-controls="p-nuxt-1" aria-selected="false" tabindex="-1">Nuxt 3</button>
+        </div>
+        <div class="tabpanel" role="tabpanel" id="p-next-1" aria-labelledby="t-next-1">
+          <div class="code"><div class="bar"><span>lib/rblog.ts</span><button class="copy" type="button">Copy</button></div><pre><code>import "server-only";
+
+const BASE = process.env.RBLOG_URL!;
+const KEY = process.env.RBLOG_CONTENT_KEY!;
+
+export class RBlogError extends Error {
+  constructor(public status: number, public body: unknown) {
+    super(`RBlog ${status}`);
+  }
+}
+
+/** GET /api/v1/content{path}, cached under `tags`, revalidated at least every 10 minutes. */
+export async function rblog&lt;T&gt;(path: string, tags: string[] = []): Promise&lt;T&gt; {
+  const res = await fetch(`${BASE}/api/v1/content${path}`, {
+    headers: { Authorization: `Bearer ${KEY}`, Accept: "application/json" },
+    next: { tags, revalidate: 600 },
+  });
+  if (!res.ok) throw new RBlogError(res.status, await res.json().catch(() =&gt; null));
+  return res.json() as Promise&lt;T&gt;;
+}</code></pre></div>
+        </div>
+        <div class="tabpanel" role="tabpanel" id="p-nuxt-1" aria-labelledby="t-nuxt-1" hidden>
+          <div class="code"><div class="bar"><span>nuxt.config.ts</span><button class="copy" type="button">Copy</button></div><pre><code>export default defineNuxtConfig({
+  runtimeConfig: {
+    // Server only (NUXT_RBLOG_URL, NUXT_RBLOG_CONTENT_KEY, NUXT_RBLOG_WEBHOOK_SECRET)
+    rblogUrl: "",
+    rblogContentKey: "",
+    rblogWebhookSecret: "",
+  },
+});</code></pre></div>
+          <div class="code"><div class="bar"><span>server/utils/rblog.ts</span><button class="copy" type="button">Copy</button></div><pre><code>/** GET /api/v1/content{path} from the Nitro server. */
+export function rblog&lt;T&gt;(path: string, query?: Record&lt;string, unknown&gt;) {
+  const { rblogUrl, rblogContentKey } = useRuntimeConfig();
+  return $fetch&lt;T&gt;(`/api/v1/content${path}`, {
+    baseURL: rblogUrl,
+    query,
+    headers: { Authorization: `Bearer ${rblogContentKey}` },
+  });
+}</code></pre></div>
+          <div class="code"><div class="bar"><span>server/api/posts/[slug].get.ts</span><button class="copy" type="button">Copy</button></div><pre><code>// Cached on the server; the webhook clears the "rblog" cache (section 09).
+export default defineCachedEventHandler(
+  (event) =&gt; rblog(`/posts/${getRouterParam(event, "slug")}`),
+  { name: "rblog", maxAge: 600, getKey: (event) =&gt; `post:${getRouterParam(event, "slug")}` },
+);</code></pre></div>
+          <p>Trang Vue gọi route của chính Nuxt (<code>useFetch('/api/posts/xin-chao')</code>), không gọi thẳng RBlog, nên key không bao giờ ra khỏi server.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="endpoint" aria-labelledby="h-endpoint">
+      <h2 id="h-endpoint"><span class="n">04</span>Danh sách endpoint</h2>
+      <div class="scroll"><table>
+        <thead><tr><th>Đường dẫn</th><th>Trả về</th><th>Tag cache gợi ý</th></tr></thead>
+        <tbody>
+          <tr><td class="m"><span class="method">GET</span>/api/v1/content/posts</td><td>Danh sách bài đã đăng, mới nhất trước; lọc và phân trang (mục 06)</td><td class="m">posts</td></tr>
+          <tr><td class="m"><span class="method">GET</span>/api/v1/content/posts/{slug}</td><td>Một bài, có <code>html</code>; slug cũ trả <code>{"redirect"}</code></td><td class="m">post:{id}, posts</td></tr>
+          <tr><td class="m"><span class="method">GET</span>/api/v1/content/pages[/{slug}]</td><td>Trang tĩnh, cùng cấu trúc với bài nhưng không có chuyên mục, thẻ, featured</td><td class="m">page:{id}, pages</td></tr>
+          <tr><td class="m"><span class="method">GET</span>/api/v1/content/categories[/{slug}]</td><td><code>{id, slug, name, description, meta_title, meta_description, post_count}</code></td><td class="m">category:{slug}</td></tr>
+          <tr><td class="m"><span class="method">GET</span>/api/v1/content/tags[/{slug}]</td><td><code>{id, slug, name, description, post_count}</code></td><td class="m">tag:{slug}</td></tr>
+          <tr><td class="m"><span class="method">GET</span>/api/v1/content/authors/{slug}</td><td><code>{slug, name, bio, website, avatar}</code>; 404 nếu tác giả chưa có bài nào đăng</td><td class="m">author:{slug}</td></tr>
+          <tr><td class="m"><span class="method">GET</span>/api/v1/content/menus/{key}</td><td>Menu <code>primary</code> hoặc <code>footer</code>, link đã resolve</td><td class="m">menu:{key}</td></tr>
+          <tr><td class="m"><span class="method">GET</span>/api/v1/content/settings</td><td>Cài đặt công khai của site</td><td class="m">settings</td></tr>
+          <tr><td class="m"><span class="method">GET</span>/api/v1/content/sitemap</td><td>Từng lô 1000 đường dẫn, có con trỏ <code>next</code></td><td class="m">sitemap</td></tr>
+          <tr><td class="m"><span class="method">GET</span>/api/v1/preview?token=…</td><td>Bản nháp để xem trước. <strong>Không cần key</strong>, token chính là quyền truy cập</td><td class="m">không cache</td></tr>
+          <tr><td class="m"><span class="method">GET</span>/api/v1/media/{id}/{name}</td><td>Ảnh công khai. <strong>Không cần key</strong></td><td class="m">CDN</td></tr>
+        </tbody>
+      </table></div>
+      <p>Cột cuối là tag nên gắn khi cache câu trả lời, trùng với tag mà webhook gửi về. Tag của bài và trang tĩnh (<code>post:{id}</code>, <code>page:{id}</code>) sẽ có khi phần quản lý bài hoàn thiện; trong lúc đó gắn thêm <code>posts</code> là đủ.</p>
+      <p>Đường dẫn công khai mà RBlog dùng ở mọi nơi (menu, sitemap, webhook): <code>/posts/{slug}</code>, <code>/{slug}</code> cho trang tĩnh, <code>/categories/{slug}</code>, <code>/tags/{slug}</code>, <code>/authors/{slug}</code>. Nếu route của frontend khác, đổi ở một hàm chuyển đổi duy nhất.</p>
+    </section>
+
+    <section id="bai-viet" aria-labelledby="h-bai-viet">
+      <h2 id="h-bai-viet"><span class="n">05</span>Trang bài viết</h2>
+      <div class="code"><div class="bar"><span>GET /api/v1/content/posts/xin-chao-viet-nam</span><button class="copy" type="button">Copy</button></div><pre><code>{
+  "id": "42",
+  "slug": "xin-chao-viet-nam",
+  "title": "Xin chào Việt Nam",
+  "excerpt": "…",
+  "html": "&lt;p&gt;…&lt;/p&gt;",
+  "cover": { "url": "https://cms.example.com/api/v1/media/…/cover.jpg", "width": 1600, "height": 900, "alt": "cover.jpg" },
+  "category": { "slug": "du-lich", "name": "Du lịch" },
+  "tags": [{ "slug": "ha-noi", "name": "Hà Nội" }],
+  "author": { "slug": "an", "name": "An" },
+  "featured": false,
+  "published_at": "2026-10-24T08:00:00Z",
+  "updated_at": "2026-10-24T09:12:00Z",
+  "reading_minutes": 4,
+  "seo": { "meta_title": null, "meta_description": null, "canonical_url": null, "og_image": null }
+}</code></pre></div>
+      <ul>
+        <li><strong><code>html</code></strong> đã được RustCMS escape toàn bộ chữ và chỉ chứa thẻ an toàn, nên chèn thẳng được (<code>dangerouslySetInnerHTML</code> hoặc <code>v-html</code>). Muốn tự render bằng component riêng thì gọi thêm <code>?include=document</code> để nhận JSON rich text.</li>
+        <li><strong>Slug cũ</strong>: API trả 200 <code>{"redirect": "slug-mới"}</code>. Frontend chuyển hướng 301 sang đường dẫn mới để giữ SEO.</li>
+        <li><strong>Trường có thể null</strong>: <code>cover</code>, <code>category</code>, <code>seo.og_image</code>, <code>author.slug</code> (tác giả chưa có hồ sơ công khai).</li>
+      </ul>
+      <div class="tabs" data-tabs>
+        <div class="tablist" role="tablist" aria-label="Framework">
+          <button role="tab" id="t-next-2" aria-controls="p-next-2" aria-selected="true">Next.js</button>
+          <button role="tab" id="t-nuxt-2" aria-controls="p-nuxt-2" aria-selected="false" tabindex="-1">Nuxt 3</button>
+        </div>
+        <div class="tabpanel" role="tabpanel" id="p-next-2" aria-labelledby="t-next-2">
+          <div class="code"><div class="bar"><span>app/posts/[slug]/page.tsx</span><button class="copy" type="button">Copy</button></div><pre><code>import { notFound, permanentRedirect } from "next/navigation";
+import { rblog, RBlogError } from "@/lib/rblog";
+
+type Post = { id: string; slug: string; title: string; html: string; /* … */ };
+type Answer = Post | { redirect: string };
+
+async function load(slug: string) {
+  try {
+    return await rblog&lt;Answer&gt;(`/posts/${slug}`, ["posts"]);
+  } catch (e) {
+    if (e instanceof RBlogError &amp;&amp; e.status === 404) notFound();
+    throw e;
+  }
+}
+
+export default async function PostPage({ params }: { params: Promise&lt;{ slug: string }&gt; }) {
+  const { slug } = await params;
+  const post = await load(slug);
+  if ("redirect" in post) permanentRedirect(`/posts/${post.redirect}`);
+  return (
+    &lt;article&gt;
+      &lt;h1&gt;{post.title}&lt;/h1&gt;
+      &lt;div className="prose" dangerouslySetInnerHTML={{ __html: post.html }} /&gt;
+    &lt;/article&gt;
+  );
+}</code></pre></div>
+          <p>Bài được cache dưới tag <code>posts</code>, nên mọi sự kiện có tag <code>posts</code> làm mới nó. Muốn làm mới chính xác từng bài theo <code>post:{id}</code>, lưu thêm một bảng ánh xạ slug → id, hoặc chỉ dùng <code>revalidatePath</code> với <code>paths</code> của webhook (mục 09).</p>
+        </div>
+        <div class="tabpanel" role="tabpanel" id="p-nuxt-2" aria-labelledby="t-nuxt-2" hidden>
+          <div class="code"><div class="bar"><span>pages/posts/[slug].vue</span><button class="copy" type="button">Copy</button></div><pre><code>&lt;script setup lang="ts"&gt;
+const route = useRoute();
+const { data, error } = await useFetch(`/api/posts/${route.params.slug}`);
+if (error.value?.statusCode === 404) throw createError({ statusCode: 404, fatal: true });
+if (data.value &amp;&amp; "redirect" in data.value) {
+  await navigateTo(`/posts/${data.value.redirect}`, { redirectCode: 301 });
+}
+useSeoMeta({
+  title: () =&gt; data.value?.seo?.meta_title ?? data.value?.title,
+  description: () =&gt; data.value?.seo?.meta_description ?? data.value?.excerpt,
+  ogImage: () =&gt; data.value?.seo?.og_image ?? data.value?.cover?.url,
+});
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;article v-if="data &amp;&amp; !('redirect' in data)"&gt;
+    &lt;h1&gt;{{ data.title }}&lt;/h1&gt;
+    &lt;div class="prose" v-html="data.html" /&gt;
+  &lt;/article&gt;
+&lt;/template&gt;</code></pre></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="danh-sach" aria-labelledby="h-danh-sach">
+      <h2 id="h-danh-sach"><span class="n">06</span>Danh sách và lọc</h2>
+      <p>Danh sách trả dạng <code>{ "data": [...], "meta": { "page", "perPage", "total", "lastPage" } }</code>. Bài và trang xếp theo thời điểm đăng rồi tới id, đều giảm dần, nên các trang không trùng hay sót bài. Mỗi mục trong danh sách có đủ trường như bài đơn lẻ, trừ <code>html</code> và <code>document</code>.</p>
+      <div class="scroll"><table>
+        <thead><tr><th>Tham số</th><th>Ý nghĩa</th></tr></thead>
+        <tbody>
+          <tr><td class="m">page, per_page</td><td>Trang từ 1; mặc định 20, tối đa 100. Nên lấy <code>posts_per_page</code> từ <code>/settings</code></td></tr>
+          <tr><td class="m">category, tag, author</td><td>Slug; kết hợp được với nhau. Slug không tồn tại trả danh sách rỗng</td></tr>
+          <tr><td class="m">featured</td><td><code>true</code>/<code>false</code> (hoặc <code>1</code>/<code>0</code>)</td></tr>
+          <tr><td class="m">q</td><td>Tìm không phân biệt dấu và hoa thường trong tiêu đề, tóm tắt, nội dung: <code>viet</code> ra "Việt". Tối đa 100 ký tự</td></tr>
+        </tbody>
+      </table></div>
+      <div class="code"><div class="bar"><span>Ví dụ</span><button class="copy" type="button">Copy</button></div><pre><code>curl -H "Authorization: Bearer $RBLOG_CONTENT_KEY" \
+  "$RBLOG_URL/api/v1/content/posts?category=du-lich&amp;tag=ha-noi&amp;page=2&amp;per_page=10"</code></pre></div>
+      <p>Mỗi tham số chỉ được truyền một lần; truyền hai lần sẽ nhận 422 trên tham số đó.</p>
+    </section>
+
+    <section id="anh" aria-labelledby="h-anh">
+      <h2 id="h-anh"><span class="n">07</span>Ảnh</h2>
+      <ul>
+        <li>URL ảnh trong <code>html</code>, <code>cover</code>, <code>avatar</code> là URL tuyệt đối trên domain của RBlog: <code>/api/v1/media/{id}/{tên-file}</code>. Không cần key.</li>
+        <li>Chỉ ảnh thuộc nội dung đang công khai mới tải được. Ảnh của bản nháp hay ảnh đã xoá trả 404, nên khi gỡ đăng một bài, ảnh của nó cũng ngừng hiển thị (tối đa 1 giờ do cache).</li>
+        <li>Header <code>Cache-Control: public, max-age=3600</code>. Giới hạn 600 request mỗi phút cho mỗi IP: khi chạy thật, đặt CDN trước RBlog hoặc dùng bộ tối ưu ảnh của framework.</li>
+        <li>RBlog không resize ảnh. Dùng <code>next/image</code> hoặc <code>@nuxt/image</code>; <code>cover.width</code> và <code>cover.height</code> có sẵn để tránh giật layout.</li>
+      </ul>
+      <div class="tabs" data-tabs>
+        <div class="tablist" role="tablist" aria-label="Framework">
+          <button role="tab" id="t-next-3" aria-controls="p-next-3" aria-selected="true">Next.js</button>
+          <button role="tab" id="t-nuxt-3" aria-controls="p-nuxt-3" aria-selected="false" tabindex="-1">Nuxt 3</button>
+        </div>
+        <div class="tabpanel" role="tabpanel" id="p-next-3" aria-labelledby="t-next-3">
+          <div class="code"><div class="bar"><span>next.config.ts</span><button class="copy" type="button">Copy</button></div><pre><code>import type { NextConfig } from "next";
+
+const config: NextConfig = {
+  images: {
+    remotePatterns: [{ protocol: "https", hostname: "cms.example.com", pathname: "/api/v1/media/**" }],
+  },
+};
+export default config;</code></pre></div>
+        </div>
+        <div class="tabpanel" role="tabpanel" id="p-nuxt-3" aria-labelledby="t-nuxt-3" hidden>
+          <div class="code"><div class="bar"><span>nuxt.config.ts</span><button class="copy" type="button">Copy</button></div><pre><code>export default defineNuxtConfig({
+  modules: ["@nuxt/image"],
+  image: { domains: ["cms.example.com"] },
+});</code></pre></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="menu-settings" aria-labelledby="h-menu-settings">
+      <h2 id="h-menu-settings"><span class="n">08</span>Menu và cài đặt site</h2>
+      <div class="code"><div class="bar"><span>GET /api/v1/content/menus/primary</span><button class="copy" type="button">Copy</button></div><pre><code>{ "key": "primary", "name": "Primary", "items": [
+  { "id": "1", "label": "Trang chủ", "href": "/", "new_tab": false, "children": [
+    { "id": "2", "label": "Xin chào", "href": "/posts/xin-chao-viet-nam", "new_tab": false }
+  ] },
+  { "id": "3", "label": "GitHub", "href": "https://github.com/…", "new_tab": true, "children": [] }
+] }</code></pre></div>
+      <p>Menu tối đa hai cấp, theo thứ tự trong admin. Mục trỏ tới nội dung chưa đăng hoặc đã xoá được bỏ ra, cùng các mục con của nó.</p>
+      <div class="code"><div class="bar"><span>GET /api/v1/content/settings</span><button class="copy" type="button">Copy</button></div><pre><code>{
+  "site_name": "Blog của An",
+  "description": "Ghi chép về Hà Nội",
+  "site_language": "vi",
+  "frontend_url": "https://blog.example.com",
+  "posts_per_page": 10,
+  "seo": {
+    "meta_title": "Blog của An",
+    "meta_description": "…",
+    "og_image_url": "https://…/og.png",
+    "social_links": { "facebook": "https://facebook.com/…", "github": "https://github.com/an" }
+  },
+  "homepage": { "shows": "latest_posts", "page_slug": null }
+}</code></pre></div>
+      <ul>
+        <li><code>site_language</code> dùng cho <code>&lt;html lang&gt;</code> và <code>og:locale</code>.</li>
+        <li><code>homepage.shows</code> là <code>latest_posts</code> hoặc <code>page</code>. Khi là <code>page</code>, trang chủ hiển thị trang tĩnh có slug <code>homepage.page_slug</code>.</li>
+        <li>Đọc settings trong layout gốc, cache dưới tag <code>settings</code>.</li>
+      </ul>
+    </section>
+
+    <section id="webhook" aria-labelledby="h-webhook">
+      <h2 id="h-webhook"><span class="n">09</span>Webhook làm mới cache</h2>
+      <p>Mỗi thay đổi ảnh hưởng tới trang công khai (lưu, đăng, gỡ đăng, xoá bài; sửa chuyên mục, thẻ, tác giả, menu, cài đặt), RBlog gửi một POST tới URL webhook. Một sự kiện được gửi <strong>ít nhất một lần</strong>, có thể tới trễ hoặc lệch thứ tự.</p>
+      <div class="code"><div class="bar"><span>Body webhook</span><button class="copy" type="button">Copy</button></div><pre><code>{
+  "id": "0192b0a4-7c1e-7000-8000-000000000001",
+  "kind": "category.updated",
+  "subject": { "type": "category", "id": "12" },
+  "tags": ["category:du-lich", "category:du-lich-cu", "posts", "sitemap"],
+  "paths": { "old": ["/categories/du-lich-cu"], "new": ["/categories/du-lich"] },
+  "created_at": "2026-10-24T08:15:30.123456Z"
+}</code></pre></div>
+      <h3>Receiver phải làm gì</h3>
+      <ol class="steps">
+        <li><div>Đọc <strong>body thô</strong> (bytes), chưa parse JSON.</div></li>
+        <li><div>Kiểm tra chữ ký: <code>X-RBlog-Signature</code> = HMAC-SHA256 hex chữ thường của <code>timestamp + "." + event_id + "." + body</code>, so sánh thời gian hằng (constant time).</div></li>
+        <li><div>Từ chối <code>X-RBlog-Timestamp</code> lệch quá 5 phút so với giờ hiện tại (chống gửi lại).</div></li>
+        <li><div>Bỏ qua <code>X-RBlog-Event-Id</code> đã xử lý (lưu vài giờ trong Redis/KV là đủ).</div></li>
+        <li><div>Làm mới mọi <code>tags</code> và mọi đường dẫn trong <code>paths.old</code> và <code>paths.new</code>. Gặp <code>kind</code> lạ cũng vẫn làm mới.</div></li>
+        <li><div>Trả <strong>2xx trong 10 giây</strong>. Lỗi 408, 425, 429, 5xx, timeout được gửi lại (8 lần trong khoảng 1 giờ); 3xx và 4xx khác bị coi là lỗi vĩnh viễn. Redirect không được đi theo.</div></li>
+      </ol>
+      <div class="tabs" data-tabs>
+        <div class="tablist" role="tablist" aria-label="Framework">
+          <button role="tab" id="t-next-4" aria-controls="p-next-4" aria-selected="true">Next.js</button>
+          <button role="tab" id="t-nuxt-4" aria-controls="p-nuxt-4" aria-selected="false" tabindex="-1">Nuxt 3</button>
+        </div>
+        <div class="tabpanel" role="tabpanel" id="p-next-4" aria-labelledby="t-next-4">
+          <div class="code"><div class="bar"><span>app/api/rblog-webhook/route.ts</span><button class="copy" type="button">Copy</button></div><pre><code>import { createHmac, timingSafeEqual } from "node:crypto";
+import { revalidatePath, revalidateTag } from "next/cache";
+
+export const runtime = "nodejs";
+const SECRET = process.env.RBLOG_WEBHOOK_SECRET!;
+const seen = new Set&lt;string&gt;(); // one instance only: use Redis/KV with a TTL when you run several
+
+export async function POST(req: Request) {
+  const id = req.headers.get("x-rblog-event-id") ?? "";
+  const ts = req.headers.get("x-rblog-timestamp") ?? "";
+  const sig = req.headers.get("x-rblog-signature") ?? "";
+  const body = Buffer.from(await req.arrayBuffer());
+
+  const expected = createHmac("sha256", SECRET).update(`${ts}.${id}.`).update(body).digest();
+  const given = Buffer.from(sig, "hex");
+  if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
+    return new Response("bad signature", { status: 401 });
+  }
+  if (Math.abs(Date.now() / 1000 - Number(ts)) &gt; 300) return new Response("stale", { status: 401 });
+  if (seen.has(id)) return new Response(null, { status: 204 });
+
+  const event = JSON.parse(body.toString("utf8")) as { tags: string[]; paths: { old: string[]; new: string[] } };
+  for (const tag of event.tags) revalidateTag(tag);
+  for (const path of [...event.paths.old, ...event.paths.new]) revalidatePath(path);
+  seen.add(id);
+  return new Response(null, { status: 204 });
+}</code></pre></div>
+        </div>
+        <div class="tabpanel" role="tabpanel" id="p-nuxt-4" aria-labelledby="t-nuxt-4" hidden>
+          <div class="code"><div class="bar"><span>server/api/rblog-webhook.post.ts</span><button class="copy" type="button">Copy</button></div><pre><code>import { createHmac, timingSafeEqual } from "node:crypto";
+
+const seen = new Set&lt;string&gt;(); // one instance only: use useStorage("redis") with a TTL when you run several
+
+export default defineEventHandler(async (event) =&gt; {
+  const { rblogWebhookSecret } = useRuntimeConfig();
+  const id = getHeader(event, "x-rblog-event-id") ?? "";
+  const ts = getHeader(event, "x-rblog-timestamp") ?? "";
+  const sig = getHeader(event, "x-rblog-signature") ?? "";
+  const body = (await readRawBody(event, false)) ?? Buffer.alloc(0);
+
+  const expected = createHmac("sha256", rblogWebhookSecret).update(`${ts}.${id}.`).update(body).digest();
+  const given = Buffer.from(sig, "hex");
+  if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
+    throw createError({ statusCode: 401, statusMessage: "bad signature" });
+  }
+  if (Math.abs(Date.now() / 1000 - Number(ts)) &gt; 300) throw createError({ statusCode: 401 });
+  if (seen.has(id)) return null;
+
+  // Simplest correct invalidation: drop every cached RBlog answer (section 03 caches under "rblog").
+  const cache = useStorage("cache");
+  for (const key of await cache.getKeys("nitro:handlers:rblog")) await cache.removeItem(key);
+  seen.add(id);
+  setResponseStatus(event, 204);
+  return null;
+});</code></pre></div>
+          <p>Với route dùng <code>routeRules</code> kiểu ISR/SWR, xoá thêm cache trang theo <code>paths</code> (cách xoá tuỳ nền tảng deploy: Vercel, Netlify, Nitro storage).</p>
+        </div>
+      </div>
+      <div class="note ok"><b>Thử ở máy dev</b> Đặt <code>allow_insecure_local = true</code> trong <code>config/webhook.toml</code> của RBlog (chỉ môi trường dev; RBlog từ chối khởi động với cờ này ở production) để nhận webhook <code>http://localhost:3000/api/rblog-webhook</code>. Trạng thái từng lần gửi xem ở trang <em>Queue</em> của admin.</div>
+      <div class="note warn"><b>Khi chưa có URL webhook</b> RBlog đánh dấu sự kiện là đã xử lý mà không gửi. Đặt URL sau đó sẽ không gửi lại các sự kiện cũ, nên hãy làm mới toàn bộ cache một lần khi mới cấu hình.</div>
+    </section>
+
+    <section id="preview" aria-labelledby="h-preview">
+      <h2 id="h-preview"><span class="n">10</span>Xem trước bản nháp</h2>
+      <p>Người viết bấm <em>Xem trước</em> trong admin; RBlog tạo link <code>{frontend_url}{preview_path}?token=…</code> (ví dụ <code>https://blog.example.com/preview?token=…</code>). Token sống 1 giờ, thu hồi được, và chỉ mở đúng một bài.</p>
+      <ul>
+        <li>Route preview của frontend gọi <code>GET {RBLOG_URL}/api/v1/preview?token=…</code> <strong>từ server, không gửi key</strong>.</li>
+        <li>Câu trả lời là bài hoặc trang như bình thường, thêm <code>"preview": {"type": "post" | "page", "status": "draft" | "pending" | "scheduled" | "published"}</code>. <code>published_at</code> có thể là <code>null</code>.</li>
+        <li>Ảnh trong bản xem trước có URL <code>/api/v1/preview/media/{id}?token=…</code>: không cache, không đưa qua bộ tối ưu ảnh dùng chung.</li>
+        <li>Không bao giờ cache trang preview. Đặt <code>noindex</code>. Token hết hạn hoặc sai: hiện thông báo "Link xem trước đã hết hạn".</li>
+      </ul>
+      <div class="tabs" data-tabs>
+        <div class="tablist" role="tablist" aria-label="Framework">
+          <button role="tab" id="t-next-5" aria-controls="p-next-5" aria-selected="true">Next.js</button>
+          <button role="tab" id="t-nuxt-5" aria-controls="p-nuxt-5" aria-selected="false" tabindex="-1">Nuxt 3</button>
+        </div>
+        <div class="tabpanel" role="tabpanel" id="p-next-5" aria-labelledby="t-next-5">
+          <div class="code"><div class="bar"><span>app/preview/page.tsx</span><button class="copy" type="button">Copy</button></div><pre><code>export const dynamic = "force-dynamic";
+export const metadata = { robots: { index: false, follow: false } };
+
+export default async function Preview({ searchParams }: { searchParams: Promise&lt;{ token?: string }&gt; }) {
+  const { token } = await searchParams;
+  if (!token) return &lt;p&gt;Thiếu token xem trước.&lt;/p&gt;;
+  const res = await fetch(`${process.env.RBLOG_URL}/api/v1/preview?token=${encodeURIComponent(token)}`, {
+    cache: "no-store",
+  });
+  if (res.status === 404) return &lt;p&gt;Link xem trước đã hết hạn hoặc không hợp lệ.&lt;/p&gt;;
+  if (!res.ok) throw new Error(`RBlog preview ${res.status}`);
+  const post = await res.json();
+  return (
+    &lt;article&gt;
+      &lt;p className="badge"&gt;Bản xem trước · {post.preview.status}&lt;/p&gt;
+      &lt;h1&gt;{post.title}&lt;/h1&gt;
+      &lt;div className="prose" dangerouslySetInnerHTML={{ __html: post.html }} /&gt;
+    &lt;/article&gt;
+  );
+}</code></pre></div>
+          <p>Dùng thẻ <code>&lt;img&gt;</code> thường (hoặc <code>unoptimized</code>) cho ảnh preview.</p>
+        </div>
+        <div class="tabpanel" role="tabpanel" id="p-nuxt-5" aria-labelledby="t-nuxt-5" hidden>
+          <div class="code"><div class="bar"><span>server/api/preview.get.ts</span><button class="copy" type="button">Copy</button></div><pre><code>export default defineEventHandler(async (event) =&gt; {
+  const token = String(getQuery(event).token ?? "");
+  if (!token) throw createError({ statusCode: 400 });
+  setResponseHeader(event, "Cache-Control", "private, no-store");
+  return $fetch(`/api/v1/preview`, { baseURL: useRuntimeConfig().rblogUrl, query: { token } });
+});</code></pre></div>
+          <div class="code"><div class="bar"><span>pages/preview.vue</span><button class="copy" type="button">Copy</button></div><pre><code>&lt;script setup lang="ts"&gt;
+useSeoMeta({ robots: "noindex, nofollow" });
+const route = useRoute();
+const { data, error } = await useFetch("/api/preview", { query: { token: route.query.token }, server: true });
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;p v-if="error"&gt;Link xem trước đã hết hạn hoặc không hợp lệ.&lt;/p&gt;
+  &lt;article v-else-if="data"&gt;
+    &lt;p class="badge"&gt;Bản xem trước · {{ data.preview.status }}&lt;/p&gt;
+    &lt;h1&gt;{{ data.title }}&lt;/h1&gt;
+    &lt;div class="prose" v-html="data.html" /&gt;
+  &lt;/article&gt;
+&lt;/template&gt;</code></pre></div>
+          <p>Thêm <code>routeRules: { "/preview": { ssr: true, cache: false } }</code> để route này không bao giờ bị cache.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="sitemap" aria-labelledby="h-sitemap">
+      <h2 id="h-sitemap"><span class="n">11</span>Sitemap và SEO</h2>
+      <p><code>GET /sitemap?type=post|page|category|tag&amp;after=&lt;cursor&gt;</code> trả <code>{ "data": [{ "type", "path", "lastmod" }], "next": "&lt;cursor&gt;" | null }</code>, tối đa 1000 dòng mỗi lần. Gọi lặp với <code>after = next</code> tới khi <code>next</code> là <code>null</code>. Chuyên mục và thẻ chỉ có mặt khi có ít nhất một bài đã đăng.</p>
+      <div class="code"><div class="bar"><span>app/sitemap.ts (Next.js)</span><button class="copy" type="button">Copy</button></div><pre><code>import type { MetadataRoute } from "next";
+import { rblog } from "@/lib/rblog";
+
+type Batch = { data: { path: string; lastmod: string }[]; next: string | null };
+const SITE = "https://blog.example.com";
+
+export default async function sitemap(): Promise&lt;MetadataRoute.Sitemap&gt; {
+  const entries: MetadataRoute.Sitemap = [];
+  for (const type of ["post", "page", "category", "tag"]) {
+    let after: string | null = null;
+    do {
+      const query = after ? `&amp;after=${encodeURIComponent(after)}` : "";
+      const batch: Batch = await rblog&lt;Batch&gt;(`/sitemap?type=${type}${query}`, ["sitemap"]);
+      for (const row of batch.data) entries.push({ url: SITE + row.path, lastModified: row.lastmod });
+      after = batch.next;
+    } while (after);
+  }
+  return entries;
+}</code></pre></div>
+      <ul>
+        <li><strong>Title và description</strong>: ưu tiên <code>seo.meta_title</code>/<code>seo.meta_description</code> của bài, rồi tới <code>title</code>/<code>excerpt</code>, cuối cùng là giá trị mặc định trong <code>/settings</code>.</li>
+        <li><strong>Ảnh chia sẻ</strong>: <code>seo.og_image</code> → <code>cover.url</code> → <code>settings.seo.og_image_url</code>.</li>
+        <li><strong>Canonical</strong>: <code>seo.canonical_url</code> nếu có, nếu không thì URL của chính trang.</li>
+        <li>Trên 50.000 URL thì chia thành nhiều sitemap kèm sitemap index.</li>
+      </ul>
+    </section>
+
+    <section id="loi" aria-labelledby="h-loi">
+      <h2 id="h-loi"><span class="n">12</span>Xử lý lỗi</h2>
+      <p>Lỗi trả dạng <code>{ "message", "code", "errors" }</code>.</p>
+      <div class="scroll"><table>
+        <thead><tr><th>Mã</th><th>Khi nào</th><th>Frontend nên làm</th></tr></thead>
+        <tbody>
+          <tr><td class="m">401</td><td>Thiếu key, key sai, hết hạn hoặc đã thu hồi</td><td>Báo động cho đội vận hành; tạo key mới trong admin</td></tr>
+          <tr><td class="m">403</td><td>Token không có quyền <code>content.read</code></td><td>Dùng đúng Content API key, không dùng token của người dùng</td></tr>
+          <tr><td class="m">404</td><td>Không có hoặc chưa đăng</td><td>Hiện trang 404 (<code>notFound()</code> / <code>createError(404)</code>)</td></tr>
+          <tr><td class="m">422</td><td>Tham số sai: <code>featured</code> lạ, <code>q</code> quá 100 ký tự, tham số lặp</td><td>Sửa query; với ô tìm kiếm, cắt từ khoá còn 100 ký tự</td></tr>
+          <tr><td class="m">429</td><td>Vượt giới hạn (ảnh, preview), có header <code>Retry-After</code></td><td>Đặt CDN trước ảnh; thử lại sau</td></tr>
+          <tr><td class="m">5xx</td><td>RBlog gặp sự cố</td><td>Phục vụ bản cache cũ (stale) nếu có</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section id="checklist" aria-labelledby="h-checklist">
+      <h2 id="h-checklist"><span class="n">13</span>Checklist trước khi chạy thật</h2>
+      <ul class="check">
+        <li>Key chỉ nằm trong biến môi trường phía server, không có trong bundle trình duyệt.</li>
+        <li>Mỗi môi trường (staging, production) dùng một key riêng, có thời hạn; thu hồi key cũ khi đổi.</li>
+        <li>Webhook dùng <code>https</code>, kiểm tra chữ ký trên body thô, chặn timestamp cũ, chống trùng theo event id.</li>
+        <li>Cache có thời hạn dự phòng (ví dụ 10 phút) phòng khi webhook lỗi.</li>
+        <li>Slug cũ được chuyển hướng 301.</li>
+        <li>Route preview không cache, có <code>noindex</code>.</li>
+        <li>Có CDN hoặc bộ tối ưu ảnh trước <code>/api/v1/media</code>.</li>
+        <li>URL frontend và đường dẫn preview đã nhập trong Cài đặt của RBlog.</li>
+        <li>Đã làm mới toàn bộ cache một lần sau khi cấu hình webhook.</li>
+      </ul>
+    </section>
+
+    <footer>
+      Đặc tả đầy đủ (tiếng Anh): <code>docs/api.md</code> trong repo RBlog. Các sự kiện webhook của bài viết và trang tĩnh (<code>post.*</code>, <code>page.*</code>) sẽ được bổ sung khi phần quản lý bài viết hoàn thiện; receiver viết theo hướng dẫn trên (làm mới mọi <code>tags</code> và <code>paths</code>, chấp nhận <code>kind</code> lạ) sẽ không phải sửa gì.
+    </footer>
+  </main>
+</div>
+
+<script>
+  // Tabs (keyboard: arrows, Home, End) and copy buttons.
+  document.querySelectorAll("[data-tabs]").forEach(function (group) {
+    var tabs = Array.prototype.slice.call(group.querySelectorAll('[role="tab"]'));
+    function select(tab) {
+      tabs.forEach(function (t) {
+        var on = t === tab;
+        t.setAttribute("aria-selected", on ? "true" : "false");
+        t.tabIndex = on ? 0 : -1;
+        document.getElementById(t.getAttribute("aria-controls")).hidden = !on;
+      });
+    }
+    tabs.forEach(function (tab, i) {
+      tab.addEventListener("click", function () { select(tab); });
+      tab.addEventListener("keydown", function (e) {
+        var next = null;
+        if (e.key === "ArrowRight") next = tabs[(i + 1) % tabs.length];
+        if (e.key === "ArrowLeft") next = tabs[(i - 1 + tabs.length) % tabs.length];
+        if (e.key === "Home") next = tabs[0];
+        if (e.key === "End") next = tabs[tabs.length - 1];
+        if (next) { e.preventDefault(); select(next); next.focus(); }
+      });
+    });
+  });
+  document.querySelectorAll(".copy").forEach(function (button) {
+    button.addEventListener("click", function () {
+      var code = button.closest(".code").querySelector("pre");
+      var done = function () { button.textContent = "Đã copy"; setTimeout(function () { button.textContent = "Copy"; }, 1500); };
+      var select = function () { var r = document.createRange(); r.selectNodeContents(code); var s = getSelection(); s.removeAllRanges(); s.addRange(r); button.textContent = "Đã chọn, nhấn ⌘C"; };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(code.innerText).then(done, select);
+      } else { select(); }
+    });
+  });
+</script>
+</html>

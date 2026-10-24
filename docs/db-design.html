@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="vi">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RBlog Database</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a reference sheet. One reading column with a contents rail on wide screens; tables scroll inside their own frame. */
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --fg: #1b2330;
+  --muted: #5b6678;
+  --line: #dde2ea;
+  --accent: #0f6e8c;      /* MySQL-ish teal, used for keys and links */
+  --accent-soft: #e3f1f5;
+  --pk: #8a5a00;
+  --pk-soft: #fbf1dc;
+  --fk: #0f6e8c;
+  --core: #6b4fa3;        /* RustCMS-owned tables */
+  --core-soft: #efeaf8;
+  --font-body: "Be Vietnam Pro", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11151b; --surface: #181e26; --fg: #e4e8ee; --muted: #9aa5b5; --line: #2a323d;
+    --accent: #5cc3df; --accent-soft: #15303a; --pk: #f0bf5a; --pk-soft: #33290f;
+    --fk: #5cc3df; --core: #b9a2ec; --core-soft: #2a2340; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11151b; --surface: #181e26; --fg: #e4e8ee; --muted: #9aa5b5; --line: #2a323d;
+  --accent: #5cc3df; --accent-soft: #15303a; --pk: #f0bf5a; --pk-soft: #33290f;
+  --fk: #5cc3df; --core: #b9a2ec; --core-soft: #2a2340; color-scheme: dark;
+}
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.6; }
+.wrap {
+  max-width: 1180px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 32px 64px;
+  display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 40px;
+}
+@media (max-width: 900px) { .wrap { grid-template-columns: minmax(0, 1fr); gap: 24px; } nav.toc { position: static !important; } }
+nav.toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 24px); align-self: start; font-size: 13px; }
+nav.toc p { margin: 0 0 8px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+nav.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+nav.toc a { color: var(--fg); text-decoration: none; display: block; padding: 3px 8px; border-radius: 6px; }
+nav.toc a:hover, nav.toc a:focus-visible { background: var(--accent-soft); color: var(--accent); outline: none; }
+nav.toc .sub a { padding-left: 20px; color: var(--muted); font-family: var(--font-mono); font-size: 12px; }
+main { min-width: 0; display: grid; gap: 40px; }
+header.hero { display: grid; gap: 12px; }
+.eyebrow { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); font-weight: 600; margin: 0; }
+h1 { font-size: 34px; line-height: 1.2; margin: 0; font-weight: 700; text-wrap: balance; }
+h2 { font-size: 22px; margin: 0 0 4px; text-wrap: balance; }
+h3 { font-size: 17px; margin: 0; font-family: var(--font-mono); font-weight: 500; }
+.lede { margin: 0; color: var(--muted); max-width: 68ch; }
+.facts { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 0; padding: 0; list-style: none; }
+.facts li { font-family: var(--font-mono); font-size: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; }
+section { display: grid; gap: 16px; }
+section > p, .prose p, .prose li { max-width: 72ch; }
+.prose { display: grid; gap: 8px; }
+.prose p { margin: 0; }
+.prose ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+code, .mono { font-family: var(--font-mono); font-size: .88em; }
+p code, li code, td code { background: var(--accent-soft); color: var(--fg); padding: 1px 5px; border-radius: 4px; }
+.diagram { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; overflow-x: auto; }
+.diagram pre.mermaid { margin: 0; min-width: 900px; background: transparent; }
+.legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 13px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; background: var(--dot); }
+.group-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 12px; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+.group-head p { margin: 0; color: var(--muted); font-size: 14px; }
+.table-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); display: grid; gap: 0; scroll-margin-top: 24px; }
+.table-card.core { border-color: color-mix(in srgb, var(--core) 35%, var(--line)); }
+.table-card > header { padding: 14px 16px 10px; display: grid; gap: 4px; }
+.table-card > header .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.table-card > header p { margin: 0; color: var(--muted); font-size: 14px; max-width: 80ch; }
+.tag { font-size: 11px; font-weight: 600; letter-spacing: .04em; padding: 2px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+.tag.core { background: var(--core-soft); color: var(--core); }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th, td { text-align: left; padding: 7px 16px; border-top: 1px solid var(--line); vertical-align: top; }
+th { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; background: color-mix(in srgb, var(--bg) 60%, var(--surface)); }
+td.col { font-family: var(--font-mono); font-size: 13px; white-space: nowrap; }
+td.type { font-family: var(--font-mono); font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+td.null { font-family: var(--font-mono); font-size: 12px; color: var(--muted); white-space: nowrap; }
+td.note { min-width: 240px; }
+.k { font-family: var(--font-mono); font-size: 10.5px; font-weight: 600; padding: 1px 5px; border-radius: 4px; margin-left: 6px; vertical-align: 1px; }
+.k.pk { background: var(--pk-soft); color: var(--pk); }
+.k.fk { background: var(--accent-soft); color: var(--fk); }
+.k.uq { background: var(--core-soft); color: var(--core); }
+.keys { padding: 10px 16px 14px; border-top: 1px solid var(--line); display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.keys div { font-family: var(--font-mono); font-size: 12.5px; overflow-wrap: anywhere; }
+.keys b { color: var(--fg); font-weight: 500; font-family: var(--font-body); }
+.rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+.rule { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; display: grid; gap: 6px; align-content: start; }
+.rule h3 { font-family: var(--font-body); font-weight: 600; font-size: 15px; }
+.rule p { margin: 0; font-size: 14px; color: var(--muted); }
+.flow { font-family: var(--font-mono); font-size: 12.5px; color: var(--fg); }
+.corelist { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px 16px; margin: 0; padding: 0; list-style: none; }
+.corelist li { font-size: 14px; color: var(--muted); }
+.corelist code { color: var(--core); background: var(--core-soft); }
+footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); padding-top: 16px; }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+
+<div class="wrap">
+  <nav class="toc" aria-label="Mục lục">
+    <p>Mục lục</p>
+    <ol>
+      <li><a href="#quy-uoc">Quy ước chung</a></li>
+      <li><a href="#so-do">Sơ đồ quan hệ</a></li>
+      <li><a href="#noi-dung">Nội dung</a></li>
+      <li class="sub"><a href="#posts">posts</a></li>
+      <li class="sub"><a href="#pages">pages</a></li>
+      <li class="sub"><a href="#post_tag">post_tag</a></li>
+      <li class="sub"><a href="#revisions">*_revisions</a></li>
+      <li><a href="#phan-loai">Phân loại</a></li>
+      <li class="sub"><a href="#categories">categories</a></li>
+      <li class="sub"><a href="#tags">tags</a></li>
+      <li class="sub"><a href="#slug_history">slug_history</a></li>
+      <li><a href="#menu-tac-gia">Menu và tác giả</a></li>
+      <li class="sub"><a href="#menus">menus</a></li>
+      <li class="sub"><a href="#menu_items">menu_items</a></li>
+      <li class="sub"><a href="#author_profiles">author_profiles</a></li>
+      <li><a href="#dong-bo">Đồng bộ với frontend</a></li>
+      <li class="sub"><a href="#content_events">content_events</a></li>
+      <li class="sub"><a href="#public_media">public_media</a></li>
+      <li class="sub"><a href="#preview_tokens">preview_tokens</a></li>
+      <li class="sub"><a href="#media_moves">media_moves</a></li>
+      <li><a href="#rustcms">Bảng của RustCMS</a></li>
+      <li><a href="#quy-tac">Quy tắc nghiệp vụ</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <header class="hero">
+      <p class="eyebrow">Thiết kế cơ sở dữ liệu</p>
+      <h1>RBlog trên MySQL 8.4</h1>
+      <p class="lede">15 bảng của RBlog cho bài viết, trang, phân loại, menu, tác giả và việc đồng bộ với frontend Nuxt/Next, đặt cạnh các bảng nền tảng của RustCMS-Core (người dùng, quyền, media, settings, hàng đợi). Lấy từ schema thật trên nhánh <code>main</code> ngày 24/10/2026.</p>
+      <ul class="facts" aria-label="Thông số chính">
+        <li>MySQL 8.4 · InnoDB</li>
+        <li>utf8mb4_0900_bin</li>
+        <li>datetime(6) · UTC</li>
+        <li>uuid → binary(16)</li>
+        <li>15 bảng RBlog · 30 bảng RustCMS</li>
+      </ul>
+    </header>
+
+    <section id="quy-uoc" aria-labelledby="quy-uoc-h">
+      <h2 id="quy-uoc-h">Quy ước chung</h2>
+      <div class="prose">
+        <ul>
+          <li><strong>Khoá chính</strong>: <code>bigint AUTO_INCREMENT</code> cho dữ liệu nội dung; <code>binary(16)</code> (UUID v7) cho media và sự kiện outbox. API trả id dạng chuỗi (định dạng wire của RustCMS).</li>
+          <li><strong>Thời điểm</strong>: <code>datetime(6)</code> lưu giờ UTC, độ chính xác micro giây. Không dùng <code>TIMESTAMP</code> (hết hạn năm 2038).</li>
+          <li><strong>Chuỗi</strong>: collation <code>utf8mb4_0900_bin</code> trên cả database, mọi cột và mọi kết nối: so sánh phân biệt hoa thường, dấu và khoảng trắng cuối. RustCMS từ chối khởi động nếu sai.</li>
+          <li><strong>Slug</strong>: chỉ chữ ASCII không dấu (<code>xin-chao-viet-nam</code>), duy nhất trong cả bảng, kể cả bản ghi trong thùng rác. Slug cũ được giữ trong <code>slug_history</code> để frontend chuyển hướng.</li>
+          <li><strong>Xoá mềm</strong>: <code>posts</code> và <code>pages</code> có <code>deleted_at</code>. Phân loại, menu và tác giả xoá hẳn.</li>
+          <li><strong>Nội dung bài</strong>: cột <code>JSON</code> theo định dạng rich text của RustCMS (tối đa 256 KiB, 100 ảnh). Bản tìm kiếm không dấu nằm ở <code>search_text</code> (<code>MEDIUMTEXT</code>).</li>
+          <li><strong>Tham chiếu media</strong>: các cột <code>*_media_id</code> không có khoá ngoại, vì media của RustCMS bị xoá mềm và RustCMS tự kiểm tra tham chiếu mỗi lần ghi.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="so-do" aria-labelledby="so-do-h">
+      <h2 id="so-do-h">Sơ đồ quan hệ</h2>
+      <p class="lede">Chỉ hiện các cột khoá và cột quan trọng. Bảng <code>users</code> và <code>media</code> thuộc RustCMS.</p>
+      <div class="diagram">
+<pre class="mermaid">
+erDiagram
+  users ||--o{ posts : "viết (RESTRICT)"
+  users ||--o{ pages : "viết (RESTRICT)"
+  users ||--o| author_profiles : "hồ sơ (CASCADE)"
+  users ||--o{ preview_tokens : "tạo (CASCADE)"
+  users |o--o{ post_revisions : "sửa (SET NULL)"
+  users |o--o{ page_revisions : "sửa (SET NULL)"
+  categories |o--o{ posts : "chuyên mục (SET NULL)"
+  posts ||--o{ post_tag : "CASCADE"
+  tags ||--o{ post_tag : "CASCADE"
+  posts ||--o{ post_revisions : "CASCADE"
+  pages ||--o{ page_revisions : "CASCADE"
+  menus ||--o{ menu_items : "CASCADE"
+  menu_items |o--o{ menu_items : "mục con (CASCADE)"
+  media |o..o{ posts : "cover, og"
+  media |o..o{ pages : "cover, og"
+  media |o..o{ author_profiles : "avatar"
+  media ||..o{ public_media : "đang công khai"
+  media ||..o| media_moves : "đang chuyển disk"
+
+  users { bigint id PK
+    varchar name
+    varchar email UK }
+  posts { bigint id PK
+    varchar slug UK
+    varchar status
+    datetime published_at
+    bigint author_id FK
+    bigint category_id FK
+    binary cover_media_id
+    json body
+    datetime deleted_at }
+  pages { bigint id PK
+    varchar slug UK
+    varchar status
+    datetime published_at
+    bigint author_id FK
+    datetime deleted_at }
+  categories { bigint id PK
+    varchar slug UK }
+  tags { bigint id PK
+    varchar slug UK }
+  post_tag { bigint post_id PK
+    bigint tag_id PK
+    int position }
+  post_revisions { bigint id PK
+    bigint post_id FK
+    char content_hash }
+  page_revisions { bigint id PK
+    bigint page_id FK
+    char content_hash }
+  menus { bigint id PK
+    varchar key UK }
+  menu_items { bigint id PK
+    bigint menu_id FK
+    bigint parent_id FK
+    varchar kind
+    bigint target_id }
+  author_profiles { bigint user_id PK
+    varchar slug UK
+    binary avatar_media_id }
+  media { binary id PK
+    varchar disk
+    varchar key }
+  public_media { binary media_id PK
+    varchar subject_type PK
+    bigint subject_id PK }
+  media_moves { binary media_id PK
+    varchar from_disk
+    varchar to_disk }
+  preview_tokens { bigint id PK
+    char token_hash UK
+    varchar subject_type
+    bigint subject_id }
+</pre>
+      </div>
+      <div class="legend">
+        <span style="--dot: var(--fk)">Đường liền: khoá ngoại thật, kèm hành động khi xoá</span>
+        <span style="--dot: var(--muted)">Đường chấm: tham chiếu không có khoá ngoại (media)</span>
+      </div>
+      <p class="lede">Ba bảng dùng cặp <code>subject_type</code> + <code>subject_id</code> để trỏ tới nhiều loại nội dung và không có khoá ngoại: <code>slug_history</code>, <code>public_media</code>, <code>preview_tokens</code>. Bảng <code>content_events</code> đứng riêng, ghi lại mọi thay đổi.</p>
+    </section>
+
+    <section id="noi-dung" aria-labelledby="noi-dung-h">
+      <div class="group-head"><h2 id="noi-dung-h">Nội dung</h2><p>Bài viết, trang tĩnh, gắn thẻ và lịch sử sửa.</p></div>
+
+      <article class="table-card" id="posts">
+        <header>
+          <div class="row"><h3>posts</h3><span class="tag">xoá mềm</span></div>
+          <p>Bài viết. Trạng thái và thời điểm đăng chỉ được đổi qua service đăng bài, không ghi trực tiếp từ form.</p>
+        </header>
+        <div class="scroll"><table>
+          <thead><tr><th>Cột</th><th>Kiểu</th><th>Null</th><th>Ghi chú</th></tr></thead>
+          <tbody>
+            <tr><td class="col">id<span class="k pk">PK</span></td><td class="type">bigint</td><td class="null">không</td><td class="note">Tự tăng</td></tr>
+            <tr><td class="col">title</td><td class="type">varchar(255)</td><td class="null">không</td><td class="note"></td></tr>
+            <tr><td class="col">slug<span class="k uq">UQ</span></td><td class="type">varchar(200)</td><td class="null">không</td><td class="note">Sinh từ tiêu đề, bỏ dấu tiếng Việt; trùng thì thêm <code>-2</code></td></tr>
+            <tr><td class="col">excerpt</td><td class="type">text</td><td class="null">có</td><td class="note">Tóm tắt</td></tr>
+            <tr><td class="col">body</td><td class="type">json</td><td class="null">có</td><td class="note">Rich text RustCMS; không có giá trị mặc định</td></tr>
+            <tr><td class="col">cover_media_id</td><td class="type">binary(16)</td><td class="null">có</td><td class="note">Ảnh bìa → <code>media.id</code></td></tr>
+            <tr><td class="col">og_media_id</td><td class="type">binary(16)</td><td class="null">có</td><td class="note">Ảnh chia sẻ mạng xã hội → <code>media.id</code></td></tr>
+            <tr><td class="col">author_id<span class="k fk">FK</span></td><td class="type">bigint</td><td class="null">không</td><td class="note">→ <code>users.id</code>, ON DELETE RESTRICT: không xoá được người còn bài</td></tr>
+            <tr><td class="col">category_id<span class="k fk">FK</span></td><td class="type">bigint</td><td class="null">có</td><td class="note">→ <code>categories.id</code>, ON DELETE SET NULL</td></tr>
+            <tr><td class="col">status</td><td class="type">varchar(16)</td><td class="null">không</td><td class="note"><code>draft</code> · <code>pending</code> · <code>scheduled</code> · <code>published</code>; mặc định <code>draft</code></td></tr>
+            <tr><td class="col">published_at</td><td class="type">datetime(6)</td><td class="null">có</td><td class="note">Thời điểm đăng (UTC); tương lai khi đang hẹn giờ</td></tr>
+            <tr><td class="col">featured</td><td class="type">tinyint(1)</td><td class="null">không</td><td class="note">Bài nổi bật; mặc định 0</td></tr>
+            <tr><td class="col">meta_title</td><td class="type">varchar(255)</td><td class="null">có</td><td class="note">SEO</td></tr>
+            <tr><td class="col">meta_description</td><td class="type">varchar(500)</td><td class="null">có</td><td class="note">SEO</td></tr>
+            <tr><td class="col">canonical_url</td><td class="type">varchar(2048)</td><td class="null">có</td><td class="note">SEO</td></tr>
+            <tr><td class="col">search_text</td><td class="type">mediumtext</td><td class="null">có</td><td class="note">Tiêu đề, tóm tắt và chữ trong bài, đã bỏ dấu, để tìm "viet" ra "Việt"</td></tr>
+            <tr><td class="col">reading_minutes</td><td class="type">int</td><td class="null">không</td><td class="note">Thời gian đọc ước tính; mặc định 0</td></tr>
+            <tr><td class="col">created_at · updated_at</td><td class="type">datetime(6)</td><td class="null">không</td><td class="note">Mặc định <code>now(6)</code></td></tr>
+            <tr><td class="col">deleted_at</td><td class="type">datetime(6)</td><td class="null">có</td><td class="note">Có giá trị khi bài nằm trong thùng rác</td></tr>
+          </tbody>
+        </table></div>
+        <div class="keys">
+          <div><b>Chỉ mục:</b> (status, deleted_at, published_at, id) cho lịch đăng · (deleted_at, status, published_at, id) cho danh sách công khai · author_id · category_id</div>
+        </div>
+      </article>
+
+      <article class="table-card" id="pages">
+        <header>
+          <div class="row"><h3>pages</h3><span class="tag">xoá mềm</span></div>
+          <p>Trang tĩnh (Giới thiệu, Liên hệ…). Cùng cột và cùng quy trình đăng với <code>posts</code>, nhưng không có chuyên mục, thẻ và <code>featured</code>.</p>
+        </header>
+        <div class="keys">
+          <div><b>Khác với posts:</b> không có category_id, featured; không có bảng gắn thẻ</div>
+          <div><b>Khoá:</b> slug UQ · author_id → users.id RESTRICT · cùng hai chỉ mục trạng thái như posts</div>
+        </div>
+      </article>
+
+      <article class="table-card" id="post_tag">
+        <header>
+          <div class="row"><h3>post_tag</h3><span class="tag">bảng nối</span></div>
+          <p>Một bài có nhiều thẻ, một thẻ có nhiều bài.</p>
+        </header>
+        <div class="scroll"><table>
+          <thead><tr><th>Cột</th><th>Kiểu</th><th>Null</th><th>Ghi chú</th></tr></thead>
+          <tbody>
+            <tr><td class="col">post_id<span class="k pk">PK</span><span class="k fk">FK</span></td><td class="type">bigint</td><td class="null">không</td><td class="note">→ <code>posts.id</code>, CASCADE</td></tr>
+            <tr><td class="col">tag_id<span class="k pk">PK</span><span class="k fk">FK</span></td><td class="type">bigint</td><td class="null">không</td><td class="note">→ <code>tags.id</code>, CASCADE</td></tr>
+            <tr><td class="col">position</td><td class="type">int</td><td class="null">không</td><td class="note">Thứ tự thẻ trong bài; mặc định 0</td></tr>
+          </tbody>
+        </table></div>
+        <div class="keys"><div><b>Chỉ mục:</b> PK (post_id, tag_id) · (tag_id, post_id) để lọc bài theo thẻ</div></div>
+      </article>
+
+      <article class="table-card" id="revisions">
+        <header>
+          <div class="row"><h3>post_revisions · page_revisions</h3><span class="tag">lịch sử</span></div>
+          <p>Mỗi lần nội dung biên tập thay đổi thì lưu một bản. Giữ 30 bản gần nhất cho mỗi bài. Chỉ server tạo; khôi phục không đổi trạng thái đăng.</p>
+        </header>
+        <div class="scroll"><table>
+          <thead><tr><th>Cột</th><th>Kiểu</th><th>Null</th><th>Ghi chú</th></tr></thead>
+          <tbody>
+            <tr><td class="col">id<span class="k pk">PK</span></td><td class="type">bigint</td><td class="null">không</td><td class="note"></td></tr>
+            <tr><td class="col">post_id / page_id<span class="k fk">FK</span></td><td class="type">bigint</td><td class="null">không</td><td class="note">→ bài hoặc trang cha, CASCADE</td></tr>
+            <tr><td class="col">title</td><td class="type">varchar(255)</td><td class="null">không</td><td class="note"></td></tr>
+            <tr><td class="col">excerpt</td><td class="type">text</td><td class="null">có</td><td class="note"></td></tr>
+            <tr><td class="col">body</td><td class="type">json</td><td class="null">có</td><td class="note"></td></tr>
+            <tr><td class="col">snapshot</td><td class="type">json</td><td class="null">không</td><td class="note">Ảnh bìa, ảnh OG, chuyên mục, id các thẻ, các trường SEO</td></tr>
+            <tr><td class="col">content_hash</td><td class="type">char(64)</td><td class="null">không</td><td class="note">SHA-256 của nội dung; trùng với bản trước thì không lưu</td></tr>
+            <tr><td class="col">author_id<span class="k fk">FK</span></td><td class="type">bigint</td><td class="null">có</td><td class="note">Người sửa → <code>users.id</code>, SET NULL</td></tr>
+            <tr><td class="col">created_at</td><td class="type">datetime(6)</td><td class="null">không</td><td class="note"></td></tr>
+          </tbody>
+        </table></div>
+        <div class="keys"><div><b>Chỉ mục:</b> (post_id, created_at, id) để liệt kê và dọn bản cũ · author_id</div></div>
+      </article>
+    </section>
+
+    <section id="phan-loai" aria-labelledby="phan-loai-h">
+      <div class="group-head"><h2 id="phan-loai-h">Phân loại</h2><p>Mỗi bài một chuyên mục, nhiều thẻ.</p></div>
+
+      <article class="table-card" id="categories">
+        <header><div class="row"><h3>categories</h3><span class="tag">xoá hẳn</span></div><p>Chuyên mục. Xoá chuyên mục thì các bài của nó trở thành không có chuyên mục.</p></header>
+        <div class="scroll"><table>
+          <thead><tr><th>Cột</th><th>Kiểu</th><th>Null</th><th>Ghi chú</th></tr></thead>
+          <tbody>
+            <tr><td class="col">id<span class="k pk">PK</span></td><td class="type">bigint</td><td class="null">không</td><td class="note"></td></tr>
+            <tr><td class="col">name</td><td class="type">varchar(120)</td><td class="null">không</td><td class="note">Ví dụ: Du lịch Đà Nẵng</td></tr>
+            <tr><td class="col">slug<span class="k uq">UQ</span></td><td class="type">varchar(160)</td><td class="null">không</td><td class="note">Ví dụ: du-lich-da-nang</td></tr>
+            <tr><td class="col">description</td><td class="type">text</td><td class="null">có</td><td class="note"></td></tr>
+            <tr><td class="col">meta_title · meta_description</td><td class="type">varchar(255) · varchar(500)</td><td class="null">có</td><td class="note">SEO của trang chuyên mục</td></tr>
+            <tr><td class="col">created_at · updated_at</td><td class="type">datetime(6)</td><td class="null">không</td><td class="note"></td></tr>
+          </tbody>
+        </table></div>
+      </article>
+
+      <article class="table-card" id="tags">
+        <header><div class="row"><h3>tags</h3><span class="tag">xoá hẳn</span></div><p>Thẻ. Cùng cột với <code>categories</code>, không có các trường SEO. Xoá thẻ thì gỡ khỏi mọi bài (CASCADE qua <code>post_tag</code>).</p></header>
+        <div class="keys"><div><b>Khoá:</b> id PK · slug varchar(160) UQ · name varchar(120) · description text</div></div>
+      </article>
+
+      <article class="table-card" id="slug_history">
+        <header><div class="row"><h3>slug_history</h3><span class="tag">chuyển hướng</span></div><p>Slug cũ của bài, trang, chuyên mục, thẻ và tác giả. Content API dùng để trả <code>{"redirect": "slug-mới"}</code> khi frontend hỏi theo slug cũ.</p></header>
+        <div class="scroll"><table>
+          <thead><tr><th>Cột</th><th>Kiểu</th><th>Null</th><th>Ghi chú</th></tr></thead>
+          <tbody>
+            <tr><td class="col">id<span class="k pk">PK</span></td><td class="type">bigint</td><td class="null">không</td><td class="note"></td></tr>
+            <tr><td class="col">subject_type</td><td class="type">varchar(16)</td><td class="null">không</td><td class="note"><code>post</code> · <code>page</code> · <code>category</code> · <code>tag</code> · <code>author</code></td></tr>
+            <tr><td class="col">subject_id</td><td class="type">bigint</td><td class="null">không</td><td class="note">Id của đối tượng (không có khoá ngoại)</td></tr>
+            <tr><td class="col">old_slug</td><td class="type">varchar(200)</td><td class="null">không</td><td class="note"></td></tr>
+            <tr><td class="col">created_at</td><td class="type">datetime(6)</td><td class="null">không</td><td class="note"></td></tr>
+          </tbody>
+        </table></div>
+        <div class="keys"><div><b>Khoá:</b> UQ (subject_type, old_slug): một slug cũ chỉ trỏ về một đối tượng</div></div>
+      </article>
+    </section>
+
+    <section id="menu-tac-gia" aria-labelledby="menu-tac-gia-h">
+      <div class="group-head"><h2 id="menu-tac-gia-h">Menu và tác giả</h2><p>Điều hướng của frontend và hồ sơ công khai của người viết.</p></div>
+
+      <article class="table-card" id="menus">
+        <header><div class="row"><h3>menus</h3></div><p>Mỗi vị trí trên frontend một menu.</p></header>
+        <div class="keys">
+          <div><b>Cột:</b> id PK · key varchar(32) UQ (<code>primary</code>, <code>footer</code>; không đổi được sau khi tạo) · name varchar(120) · created_at · updated_at</div>
+        </div>
+      </article>
+
+      <article class="table-card" id="menu_items">
+        <header><div class="row"><h3>menu_items</h3></div><p>Mục menu, tối đa hai cấp. Content API chỉ trả mục trỏ tới nội dung đang công khai.</p></header>
+        <div class="scroll"><table>
+          <thead><tr><th>Cột</th><th>Kiểu</th><th>Null</th><th>Ghi chú</th></tr></thead>
+          <tbody>
+            <tr><td class="col">id<span class="k pk">PK</span></td><td class="type">bigint</td><td class="null">không</td><td class="note"></td></tr>
+            <tr><td class="col">menu_id<span class="k fk">FK</span></td><td class="type">bigint</td><td class="null">không</td><td class="note">→ <code>menus.id</code>, CASCADE; không đổi được sau khi tạo</td></tr>
+            <tr><td class="col">parent_id<span class="k fk">FK</span></td><td class="type">bigint</td><td class="null">có</td><td class="note">→ <code>menu_items.id</code>, CASCADE; cùng menu, cha không có cha</td></tr>
+            <tr><td class="col">label</td><td class="type">varchar(120)</td><td class="null">không</td><td class="note"></td></tr>
+            <tr><td class="col">kind</td><td class="type">varchar(16)</td><td class="null">không</td><td class="note"><code>url</code> · <code>post</code> · <code>page</code> · <code>category</code> · <code>tag</code></td></tr>
+            <tr><td class="col">target_id</td><td class="type">bigint</td><td class="null">có</td><td class="note">Bắt buộc khi kind khác <code>url</code></td></tr>
+            <tr><td class="col">url</td><td class="type">varchar(2048)</td><td class="null">có</td><td class="note">Chỉ khi kind = <code>url</code>: https, http, mailto hoặc đường dẫn <code>/…</code></td></tr>
+            <tr><td class="col">new_tab</td><td class="type">tinyint(1)</td><td class="null">không</td><td class="note">Mặc định 0</td></tr>
+            <tr><td class="col">position</td><td class="type">int</td><td class="null">không</td><td class="note">Số nhỏ đứng trước; mặc định 0</td></tr>
+            <tr><td class="col">created_at · updated_at</td><td class="type">datetime(6)</td><td class="null">không</td><td class="note"></td></tr>
+          </tbody>
+        </table></div>
+        <div class="keys"><div><b>Chỉ mục:</b> (menu_id, parent_id, position) · parent_id</div></div>
+      </article>
+
+      <article class="table-card" id="author_profiles">
+        <header><div class="row"><h3>author_profiles</h3></div><p>Hồ sơ công khai của một người dùng. Content API chỉ hiện tác giả có ít nhất một bài đã đăng, không bao giờ trả email.</p></header>
+        <div class="scroll"><table>
+          <thead><tr><th>Cột</th><th>Kiểu</th><th>Null</th><th>Ghi chú</th></tr></thead>
+          <tbody>
+            <tr><td class="col">user_id<span class="k pk">PK</span><span class="k fk">FK</span></td><td class="type">bigint</td><td class="null">không</td><td class="note">→ <code>users.id</code>, CASCADE; một người một hồ sơ</td></tr>
+            <tr><td class="col">slug<span class="k uq">UQ</span></td><td class="type">varchar(160)</td><td class="null">không</td><td class="note">Sinh từ tên người dùng</td></tr>
+            <tr><td class="col">bio</td><td class="type">text</td><td class="null">có</td><td class="note">Tối đa 1000 ký tự</td></tr>
+            <tr><td class="col">avatar_media_id</td><td class="type">binary(16)</td><td class="null">có</td><td class="note">→ <code>media.id</code></td></tr>
+            <tr><td class="col">website</td><td class="type">varchar(2048)</td><td class="null">có</td><td class="note">https</td></tr>
+            <tr><td class="col">created_at · updated_at</td><td class="type">datetime(6)</td><td class="null">không</td><td class="note"></td></tr>
+          </tbody>
+        </table></div>
+      </article>
+    </section>
+
+    <section id="dong-bo" aria-labelledby="dong-bo-h">
+      <div class="group-head"><h2 id="dong-bo-h">Đồng bộ với frontend</h2><p>Các bảng giữ cho frontend biết khi nào cần làm mới, ảnh nào được công khai, và link xem trước bản nháp.</p></div>
+
+      <article class="table-card" id="content_events">
+        <header><div class="row"><h3>content_events</h3><span class="tag">outbox</span></div><p>Mỗi thay đổi ảnh hưởng tới trang công khai ghi một dòng, trong cùng transaction với thay đổi đó. Job gửi webhook cho frontend ít nhất một lần, thử lại tối đa 8 lần.</p></header>
+        <div class="scroll"><table>
+          <thead><tr><th>Cột</th><th>Kiểu</th><th>Null</th><th>Ghi chú</th></tr></thead>
+          <tbody>
+            <tr><td class="col">id<span class="k pk">PK</span></td><td class="type">binary(16)</td><td class="null">không</td><td class="note">UUID v7; frontend dùng để chống trùng</td></tr>
+            <tr><td class="col">kind</td><td class="type">varchar(48)</td><td class="null">không</td><td class="note">Ví dụ <code>post.published</code>, <code>category.updated</code>, <code>menu.updated</code></td></tr>
+            <tr><td class="col">subject_type · subject_id</td><td class="type">varchar(16) · bigint</td><td class="null">id có</td><td class="note">Đối tượng thay đổi</td></tr>
+            <tr><td class="col">payload</td><td class="type">json</td><td class="null">không</td><td class="note"><code>{"tags": […], "paths": {"old": […], "new": […]}}</code></td></tr>
+            <tr><td class="col">created_at</td><td class="type">datetime(6)</td><td class="null">không</td><td class="note"></td></tr>
+            <tr><td class="col">delivered_at</td><td class="type">datetime(6)</td><td class="null">có</td><td class="note">Có giá trị khi frontend đã nhận</td></tr>
+            <tr><td class="col">attempts</td><td class="type">int</td><td class="null">không</td><td class="note">Số lần đã gửi</td></tr>
+            <tr><td class="col">last_error</td><td class="type">varchar(500)</td><td class="null">có</td><td class="note">Đã che secret</td></tr>
+            <tr><td class="col">job_id</td><td class="type">binary(16)</td><td class="null">có</td><td class="note">Job gửi đang xử lý; poller không gửi lại khi job còn trong hàng đợi</td></tr>
+            <tr><td class="col">gave_up_at</td><td class="type">datetime(6)</td><td class="null">có</td><td class="note">Đã bỏ cuộc (lỗi vĩnh viễn hoặc hết 8 lần)</td></tr>
+          </tbody>
+        </table></div>
+        <div class="keys"><div><b>Chỉ mục:</b> (delivered_at, created_at) cho poller tìm sự kiện chưa gửi</div></div>
+      </article>
+
+      <article class="table-card" id="public_media">
+        <header><div class="row"><h3>public_media</h3></div><p>Ảnh nào đang được nội dung công khai sử dụng. Route ảnh công khai chỉ phục vụ ảnh có ở đây, nên ảnh của bản nháp không lộ ra ngoài. Một ảnh dùng ở nhiều bài có nhiều dòng; gỡ đăng một bài không làm ẩn ảnh mà bài khác còn dùng.</p></header>
+        <div class="keys">
+          <div><b>Cột:</b> media_id binary(16) · subject_type varchar(16) (<code>post</code> · <code>page</code>) · subject_id bigint</div>
+          <div><b>Khoá:</b> PK (media_id, subject_type, subject_id) · chỉ mục (subject_type, subject_id)</div>
+        </div>
+      </article>
+
+      <article class="table-card" id="preview_tokens">
+        <header><div class="row"><h3>preview_tokens</h3></div><p>Link xem trước bản nháp trên frontend. Chỉ lưu hash của token; hết hạn sau 1 giờ, thu hồi được.</p></header>
+        <div class="scroll"><table>
+          <thead><tr><th>Cột</th><th>Kiểu</th><th>Null</th><th>Ghi chú</th></tr></thead>
+          <tbody>
+            <tr><td class="col">id<span class="k pk">PK</span></td><td class="type">bigint</td><td class="null">không</td><td class="note"></td></tr>
+            <tr><td class="col">token_hash<span class="k uq">UQ</span></td><td class="type">char(64)</td><td class="null">không</td><td class="note">SHA-256 hex; token gốc không bao giờ được lưu</td></tr>
+            <tr><td class="col">subject_type · subject_id</td><td class="type">varchar(16) · bigint</td><td class="null">không</td><td class="note">Bài hoặc trang được xem trước</td></tr>
+            <tr><td class="col">created_by<span class="k fk">FK</span></td><td class="type">bigint</td><td class="null">không</td><td class="note">→ <code>users.id</code>, CASCADE</td></tr>
+            <tr><td class="col">expires_at</td><td class="type">datetime(6)</td><td class="null">không</td><td class="note"></td></tr>
+            <tr><td class="col">revoked_at</td><td class="type">datetime(6)</td><td class="null">có</td><td class="note"></td></tr>
+            <tr><td class="col">created_at</td><td class="type">datetime(6)</td><td class="null">không</td><td class="note"></td></tr>
+          </tbody>
+        </table></div>
+      </article>
+
+      <article class="table-card" id="media_moves">
+        <header><div class="row"><h3>media_moves</h3><span class="tag">vận hành</span></div><p>Nhật ký của lệnh <code>media:move-disk</code> khi chuyển thư viện media giữa disk local và S3. Cho phép chạy tiếp khi bị ngắt và biết bản cũ nào cần dọn.</p></header>
+        <div class="keys">
+          <div><b>Cột:</b> media_id binary(16) PK · from_disk varchar(16) · key varchar(128) · to_disk varchar(16) · copied_at datetime(6)</div>
+        </div>
+      </article>
+    </section>
+
+    <section id="rustcms" aria-labelledby="rustcms-h">
+      <div class="group-head"><h2 id="rustcms-h">Bảng của RustCMS</h2><p>Do RustCMS-Core tạo và quản lý qua migration của framework. RBlog không ghi trực tiếp vào các bảng quyền.</p></div>
+
+      <article class="table-card core">
+        <header><div class="row"><h3>users</h3><span class="tag core">RustCMS</span></div><p>Người dùng của trang quản trị và user hệ thống <code>frontend@rblog.local</code> mà Content API key thuộc về.</p></header>
+        <div class="keys"><div><b>Cột chính:</b> id bigint PK · name · email UQ · password (băm argon2) · is_active · locale · email_verified_at · created_at · updated_at</div></div>
+      </article>
+
+      <article class="table-card core">
+        <header><div class="row"><h3>media</h3><span class="tag core">RustCMS</span></div><p>Thư viện file đã upload. Chỉ nhận PNG, JPEG, GIF, WebP, PDF; tối đa 10 MiB; SVG luôn bị từ chối.</p></header>
+        <div class="keys"><div><b>Cột chính:</b> id binary(16) PK · disk (<code>local</code> hoặc <code>s3</code>) · key · name · mime · size · sha256 · width · height · owner_id · created_at · deleted_at</div></div>
+      </article>
+
+      <article class="table-card core">
+        <header><div class="row"><h3>settings</h3><span class="tag core">RustCMS</span></div><p>Mỗi nhóm settings một dòng: <code>general</code>, <code>reading</code>, <code>seo</code>, <code>integrations</code>. Secret (webhook secret) mã hoá bằng APP_KEY trong cột <code>secrets</code>.</p></header>
+        <div class="keys"><div><b>Cột:</b> name varchar(32) PK · value json · secrets json · version bigint · updated_at · updated_by</div></div>
+      </article>
+
+      <article class="table-card core">
+        <header><div class="row"><h3>personal_access_tokens</h3><span class="tag core">RustCMS</span></div><p>Content API key của frontend (quyền duy nhất <code>content.read</code>). Chỉ lưu hash.</p></header>
+        <div class="keys"><div><b>Cột:</b> id · user_id · name · token_hash · abilities · last_used_at · expires_at · revoked_at · created_at</div></div>
+      </article>
+
+      <div class="prose">
+        <p>Các bảng còn lại của RustCMS:</p>
+      </div>
+      <ul class="corelist">
+        <li><code>roles</code>, <code>permissions</code>, <code>role_has_permissions</code>, <code>model_has_roles</code>, <code>model_has_permissions</code>: phân quyền</li>
+        <li><code>sessions</code>, <code>auth_generations</code>, <code>user_tokens</code>, <code>jwt_families</code>, <code>jwt_refresh_tokens</code>: đăng nhập</li>
+        <li><code>audit_logs</code>: nhật ký thao tác</li>
+        <li><code>jobs</code>, <code>job_receipts</code>, <code>job_runs</code>: hàng đợi</li>
+        <li><code>schedule_slots</code>, <code>schedule_states</code>, <code>schedule_runs</code>: lịch chạy định kỳ</li>
+        <li><code>media_uploads</code>, <code>media_deletions</code>: upload và xoá file an toàn khi crash</li>
+        <li><code>exports</code>, <code>export_objects</code>, <code>imports</code>, <code>import_rows</code>: xuất nhập CSV</li>
+        <li><code>idempotency_keys</code>, <code>rustcms_locks</code>, <code>seaql_migrations</code>: hạ tầng</li>
+      </ul>
+    </section>
+
+    <section id="quy-tac" aria-labelledby="quy-tac-h">
+      <h2 id="quy-tac-h">Quy tắc nghiệp vụ gắn với dữ liệu</h2>
+      <div class="rules">
+        <div class="rule">
+          <h3>Vòng đời một bài</h3>
+          <p class="flow">draft → pending → scheduled → published</p>
+          <p>Gửi duyệt cần quyền sửa bài. Đăng, hẹn giờ, gỡ đăng cần <code>posts.publish</code>. Scheduler chạy mỗi phút, đăng mọi bài <code>scheduled</code> đã tới giờ, kể cả bài bị lỡ khi app tắt.</p>
+        </div>
+        <div class="rule">
+          <h3>Thế nào là "đang công khai"</h3>
+          <p>status = <code>published</code>, published_at ≤ hiện tại, deleted_at rỗng. Content API, sitemap, menu và ảnh công khai đều dùng cùng một điều kiện này.</p>
+        </div>
+        <div class="rule">
+          <h3>Một đường ghi chung</h3>
+          <p>Mọi thay đổi bài (lưu, đăng, thùng rác, khôi phục, gắn thẻ) đi qua một service, cập nhật trong cùng transaction: <code>search_text</code>, <code>public_media</code>, <code>slug_history</code>, revision và <code>content_events</code>.</p>
+        </div>
+        <div class="rule">
+          <h3>Tìm kiếm tiếng Việt</h3>
+          <p>Collation phân biệt dấu nên không tìm trực tiếp trên <code>title</code>. Dữ liệu và từ khoá cùng được bỏ dấu, tìm trong <code>search_text</code> bằng LIKE, từ khoá tối đa 100 ký tự.</p>
+        </div>
+        <div class="rule">
+          <h3>Khi xoá</h3>
+          <p>Không xoá được người dùng còn bài (RESTRICT). Xoá chuyên mục: bài mất chuyên mục. Xoá thẻ, menu, bài: dữ liệu con đi theo (CASCADE). Xoá một bản ghi có slug cũ: frontend nhận event để purge cả đường dẫn cũ.</p>
+        </div>
+        <div class="rule">
+          <h3>Migration</h3>
+          <p>Chỉ thêm, không sửa migration đã chạy. Chạy lại an toàn khi lỗi giữa chừng (MySQL commit từng câu DDL). <code>down</code> từ chối nếu làm mất dữ liệu.</p>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      Nguồn: <code>SHOW CREATE TABLE</code> trên database dev, nhánh <code>main</code> tại commit 86a8174 (24/10/2026), cùng migration trong <code>src/database/migrations/</code>. Phần bài viết (Post, Page) đang hoàn thiện resource và quy trình đăng; schema các bảng đã cố định.
+    </footer>
+  </main>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+<script>
+  (function () {
+    var dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+    if (window.mermaid) {
+      window.mermaid.initialize({ startOnLoad: true, theme: dark ? "dark" : "neutral", er: { useMaxWidth: false } });
+    }
+  })();
+</script>
+</html>
