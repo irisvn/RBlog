@@ -21,6 +21,7 @@ mod revisions;
 mod rich_text;
 mod settings;
 mod taxonomy;
+mod version;
 mod webhook;
 mod webhook_job;
 // rustcms:tests

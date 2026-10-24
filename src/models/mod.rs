@@ -13,6 +13,7 @@ pub mod post_revision;
 pub mod post_tag;
 pub mod preview_token;
 pub mod public_media;
+pub mod release_check;
 pub mod slug_history;
 pub mod tag;
 // rustcms:models

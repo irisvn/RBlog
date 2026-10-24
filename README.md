@@ -61,6 +61,10 @@ one Rust binary built on [RustCMS](https://irisvn.github.io/RustCMS/) v0.10.3, o
 
   <img src="docs/images/content-api.png" width="800" alt="The Content API page: no keys yet, and how to use a key with curl">
 
+- **Version** on Integrations → Version: what runs (version, commit, build, RustCMS Core, MySQL),
+  whether a newer release is out (checked on GitHub every 6 hours, or now), its notes, and how to
+  update with docker compose; administrators also see a newer release on the dashboard. RBlog
+  never updates itself ([docs/deployment.md](docs/deployment.md)).
 - **Vietnamese and English**, **dark mode**, and phone widths (390 px) without sideways scrolling.
   On a phone, a record's header keeps its main action and a ⋯ menu with the rest.
 
@@ -70,6 +74,9 @@ one Rust binary built on [RustCMS](https://irisvn.github.io/RustCMS/) v0.10.3, o
   once, with cache tags and old and new paths.
 
 ## Quick start
+
+For development. To run RBlog on a server (the release image and MySQL with docker compose,
+updates, backups, rollback), see [docs/deployment.md](docs/deployment.md).
 
 Needs Docker, the Rust toolchain and the `rustcms` CLI.
 
@@ -182,7 +189,10 @@ Tests run on the in-memory `mysql-test` server (port 3307), never on the develop
   are skipped and a newer push cancels the older run. `admin.yml` rebuilds the admin bundle when
   `resources/admin` changes and fails if the committed one differs.
 - **Releases**: push a tag `vX.Y.Z` (matching `Cargo.toml`) on a commit whose CI is green. It builds
-  the Linux binaries (x86_64, arm64) and the image `ghcr.io/irisvn/rblog` (`docker/Dockerfile`).
+  the Linux binaries (x86_64, arm64) as release builds (`RBLOG_VERSION`, `RBLOG_COMMIT`:
+  `build.rs`), the image `ghcr.io/irisvn/rblog:X.Y.Z` and `:latest` (`docker/Dockerfile`), and the
+  GitHub Release whose notes the Version page shows. Only release builds are compared with
+  releases; local (`source`) and CI (`development`) builds are not.
 - Commit `Cargo.lock`: it pins the RustCMS commit and every dependency.
 
 ### Test and CI times
@@ -215,5 +225,7 @@ Tests run on the in-memory `mysql-test` server (port 3307), never on the develop
 - [docs/frontend-integration.html](docs/frontend-integration.html): building the public site on it.
 - [docs/db-design.html](docs/db-design.html): tables, keys and business rules.
 - [docs/media.md](docs/media.md): disks, alt texts, moving files between disks.
+- [docs/deployment.md](docs/deployment.md): running RBlog with docker compose: first install,
+  environment, updating, backups, rollback, release checks.
 - [docs/ui-guidelines.md](docs/ui-guidelines.md): the admin design system.
 - [CHANGELOG.md](CHANGELOG.md) and [CLAUDE.md](CLAUDE.md) (rules for working on this repository).

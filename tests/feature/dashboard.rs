@@ -18,16 +18,19 @@ db_test!(the_authors_widget_counts_profiles, migrate = Migrator, |db: TestDb| as
     UserFactory::new().name("Khách").create(app.state().db()).await;
     let panel = admin(&app).await;
 
+    // An administrator's dashboard starts with the notice of a newer RBlog release
+    // (tests/feature/version.rs), then the authors.
     let dashboard = panel.get(&app.admin_api("dashboard")).await;
-    dashboard.assert_status(StatusCode::OK).assert_json("/widgets/0/name", json!("authors"));
-    dashboard.assert_json("/widgets/0/kind", json!("stat")).assert_json("/widgets/0/resource", json!("authors"));
+    dashboard.assert_status(StatusCode::OK).assert_json("/widgets/0/name", json!("rblog_update"));
+    dashboard.assert_json("/widgets/1/name", json!("authors"));
+    dashboard.assert_json("/widgets/1/kind", json!("stat")).assert_json("/widgets/1/resource", json!("authors"));
     panel
         .get(&app.admin_api("dashboard/widgets/authors"))
         .await
         .assert_status(StatusCode::OK)
         .assert_json("", json!({"kind": "stat", "value": "3"}));
     // Labels in the user's language.
-    panel.languages("vi").get(&app.admin_api("dashboard")).await.assert_json("/widgets/0/label", json!("Tác giả"));
+    panel.languages("vi").get(&app.admin_api("dashboard")).await.assert_json("/widgets/1/label", json!("Tác giả"));
 });
 
 db_test!(a_widget_needs_its_permission_and_its_resource, migrate = Migrator, |db: TestDb| async move {

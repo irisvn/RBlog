@@ -2,4 +2,5 @@
 
 pub mod content_sync_public_media;
 pub mod media_move_disk;
+pub mod version_check;
 // rustcms:commands

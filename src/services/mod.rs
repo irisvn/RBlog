@@ -15,5 +15,6 @@ pub mod search;
 pub mod site;
 pub mod slug;
 pub mod taxonomy;
+pub mod version;
 pub mod webhook;
 // rustcms:services

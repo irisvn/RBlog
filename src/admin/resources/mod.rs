@@ -18,6 +18,7 @@ pub mod page_revision_resource;
 pub mod post_author_resource;
 pub mod post_resource;
 pub mod post_revision_resource;
+pub mod release_update_resource;
 pub mod tag_resource;
 pub mod user_resource;
 // rustcms:resource-mods

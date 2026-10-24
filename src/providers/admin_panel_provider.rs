@@ -46,11 +46,15 @@ pub fn provider() -> AdminProvider {
         .resource::<crate::admin::resources::post_author_resource::PostAuthorResource>()
         .resource::<crate::admin::resources::post_revision_resource::PostRevisionResource>()
         .resource::<crate::admin::resources::page_revision_resource::PageRevisionResource>()
+        // The dashboard's notice of a newer RBlog release (read only, no navigation entry).
+        .resource::<crate::admin::resources::release_update_resource::ReleaseUpdateResource>()
         // rustcms:resources
         // Widgets above the resource cards (`admin::dashboard`).
         .dashboard(crate::admin::dashboard::with_post_widgets(crate::admin::dashboard::dashboard()))
         // Integrations: the Content API keys of the public site (a React page on `routes::admin`).
         .page::<crate::admin::pages::content_api_page::ContentApiPage>()
+        // Integrations → Version: what runs and whether a newer release is out (`routes::admin`).
+        .page::<crate::admin::pages::version_page::VersionPage>()
         // rustcms:pages
         .extension_script_v2(
             "content-api",
@@ -67,5 +71,11 @@ pub fn provider() -> AdminProvider {
             Requires { react: "19.3", react_query: "5.104", ui: 2 },
         )
         .extension_style("content", include_str!("../../resources/admin/css/rblog/content.css"))
+        .extension_script_v2(
+            "version",
+            include_str!("../../resources/admin/js/rblog/version.js"),
+            Requires { react: "19.3", react_query: "5.104", ui: 2 },
+        )
+        .extension_style("version", include_str!("../../resources/admin/css/rblog/version.css"))
     // rustcms:extensions
 }

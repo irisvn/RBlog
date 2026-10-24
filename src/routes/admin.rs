@@ -7,10 +7,13 @@
 //! - `/previews/{posts|pages}/{id}`: preview links of the post and page pages (the
 //!   `rblog/content-preview` slot). The route needs `posts.view` / `pages.view`; the record itself
 //!   is then read as the panel reads it for the user (scope and policy).
+//! - `/system/version`: Integrations → Version (`crate::admin::pages::version_page`), and its "Check
+//!   now" (`/system/version/check`, at most once a minute).
 
 use rustcms::prelude::*;
 
-use crate::http::controllers::{content_keys, previews};
+use crate::http::controllers::{content_keys, previews, version};
+use crate::services::version::PERMISSION as SYSTEM_VERSION;
 
 /// See and use the Integrations pages (the Content API keys' list).
 pub const INTEGRATIONS_VIEW: &str = "integrations.view";
@@ -33,6 +36,14 @@ pub fn routes() -> AdminRoutes {
                 "/pages/{id}",
                 AdminAccess::can("pages.view"),
                 previews::page,
+            ),
+        )
+        .nest(
+            "/system",
+            AdminRoutes::scope().get("/version", AdminAccess::can(SYSTEM_VERSION), version::show).post(
+                "/version/check",
+                AdminAccess::can(SYSTEM_VERSION),
+                version::check,
             ),
         )
 }

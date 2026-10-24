@@ -41,7 +41,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with: { shared-key: "release-${{ matrix.arch }}" }
-      - run: cargo build --release --locked
+      # A release build (`build.rs`): its version and commit, so the Version page compares it with
+      # newer releases (`RBLOG_VERSION` must equal Cargo.toml's, checked above and by build.rs).
+      - name: Build
+        run: RBLOG_VERSION="${GITHUB_REF_NAME#v}" RBLOG_COMMIT="$GITHUB_SHA" cargo build --release --locked
       - name: Package
         run: |
           mkdir -p "dist/${{ matrix.arch }}"

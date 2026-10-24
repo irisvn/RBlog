@@ -258,6 +258,10 @@ const SEQUENCES = [
   screen("/settings/reading", "settings-reading"),
   screen("/settings/seo", "settings-seo"),
   screen("/settings/integrations", "settings-integrations"),
+  // The Version page and the dashboard (its notice of a newer release, when the last check found
+  // one: run the app with `[releases] url` on a local list of releases to show it).
+  screen("/p/version", "version"),
+  screen("/", "dashboard"),
 ];
 
 /** A sequence of one shot `name` of `path`, of the full page unless `full` is false. */

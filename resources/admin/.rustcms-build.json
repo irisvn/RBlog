@@ -1,6 +1,8 @@
 [
   "css/rblog/content-api.css",
   "css/rblog/content.css",
+  "css/rblog/version.css",
   "js/rblog/content-api.js",
-  "js/rblog/content.js"
+  "js/rblog/content.js",
+  "js/rblog/version.js"
 ]

@@ -362,3 +362,23 @@ the change (`src/services/content_sync.rs`). Its payload:
 
 Keep a fallback time-based revalidation (for example 10 minutes) in case the webhook stays
 unreachable.
+
+## Admin routes
+
+Not part of the Content API: the JSON routes of the admin's own pages, on the admin session
+(`src/routes/admin.rs`, served under `{admin}/api/x`, RustCMS `AdminRoutes`). Each declares its
+permission, checked before the request is read: 401 without a session, 403 without the
+permission; writes need the session's CSRF token.
+
+| Method | Path | Permission | |
+|---|---|---|---|
+| GET | `/integrations/content-keys` | `integrations.view` | the Content API keys (above), `?page`, `?per_page` |
+| POST | `/integrations/content-keys` | `integrations.manage` | `{"name", "expires_in_days"}`: a new key, its secret once |
+| DELETE | `/integrations/content-keys/{id}` | `integrations.manage` | revokes a key |
+| POST | `/previews/posts/{id}`, `/previews/pages/{id}` | `posts.view` / `pages.view` | a preview link (then the record as the panel reads it for the user) |
+| GET | `/system/version` | `system.version` | the Version page: what runs (`running`: version, commit, channel `release`/`development`/`source`, RustCMS Core, MySQL, OS and architecture, start time), `state` (`update`, `current`, `no_release`, `not_checked`, `not_compared`), `update` (the newer version, or `null`), the last check (`checked_at`, `error: {code, status, at}`, `next_manual_at`), the newest release (`version`, `notes` as plain text, `url`, `published_at`) and `newer_migrations` |
+| POST | `/system/version/check` | `system.version` | checks GitHub's releases now, then answers as `GET`; **429** with `Retry-After` within a minute of the last check (manual or scheduled). A failed check still answers 200, with `check.error` |
+
+`system.version` also shows the dashboard's notice of a newer release (widget `rblog_update`, over
+the read-only resource `release_updates`). Development and source builds are never compared with
+releases (`state: not_compared`, no notice). See [deployment.md](deployment.md).

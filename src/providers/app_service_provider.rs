@@ -10,6 +10,7 @@ use rustcms::schedule::Schedule;
 use crate::jobs::publish_due::PublishDue;
 use crate::jobs::redispatch_content_events::RedispatchContentEvents;
 use crate::services::events::WebhookConfig;
+use crate::services::version::{self, Build, ReleasesConfig};
 
 pub struct AppServiceProvider;
 
@@ -37,14 +38,32 @@ impl ServiceProvider for AppServiceProvider {
             Schedule::every("publish-due", Duration::from_secs(60)).job(|| PublishDue {}).without_overlapping(),
         );
         app.command(crate::console::media_move_disk::MediaMoveDisk);
+        // What this binary is (Integrations → Version); tests bind another build after this.
+        app.bind(Build::compiled());
+        // A newer RBlog release (`services::version::check`): once per slot across instances.
+        app.schedule(
+            Schedule::every(version::SCHEDULE, version::PERIOD)
+                .task(|ctx| async move {
+                    let Ok(found) = version::check(&ctx.state, version::Trigger::Schedule).await? else {
+                        return Ok(Some("skipped".to_owned()));
+                    };
+                    Ok(Some(version::summary(&found)))
+                })
+                .timeout(Duration::from_secs(90)),
+        );
         app.command(crate::console::content_sync_public_media::ContentSyncPublicMedia);
+        app.command(crate::console::version_check::VersionCheck);
         // rustcms:commands
     }
 
     /// Refuses to boot on an invalid `[webhook]` section (`config/webhook.toml`), including
-    /// `allow_insecure_local = true` in production.
+    /// `allow_insecure_local = true` in production, or an invalid `[releases]` section
+    /// (`config/releases.toml`), including a `url` in production. Then records what this process
+    /// runs as (`services::version::install`).
     async fn boot(&self, state: &AppState) -> anyhow::Result<()> {
         WebhookConfig::of(state.config())?;
+        ReleasesConfig::of(state.config())?;
+        version::install(state.service::<Build>().map_or_else(Build::compiled, |b| (*b).clone()));
         Ok(())
     }
 }

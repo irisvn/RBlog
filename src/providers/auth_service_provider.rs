@@ -7,7 +7,7 @@ use rustcms::prelude::*;
 use crate::database::seeders::role_seeder::{AUTHOR, CONTRIBUTOR, EDITOR, permissions_of};
 use crate::policies::content::{PAGES_PUBLISH, POSTS_EDIT_OTHERS, POSTS_PUBLISH, POSTS_VIEW_ALL};
 use crate::routes::admin::{INTEGRATIONS_MANAGE, INTEGRATIONS_VIEW};
-use crate::services::content_api;
+use crate::services::{content_api, version};
 
 pub fn provider(api: &ApiRoutes, admin: &AdminRoutes) -> AuthProvider {
     AuthProvider::new()
@@ -116,6 +116,16 @@ pub fn provider(api: &ApiRoutes, admin: &AdminRoutes) -> AuthProvider {
                 .permissions(permissions_of(CONTRIBUTOR)),
         )
         .permission_area("integrations", PermissionArea::new("Integrations"))
+        .permission_meta(
+            ADMIN_GUARD,
+            version::PERMISSION,
+            PermissionMeta::new()
+                .label("See the version and new releases")
+                .description(
+                    "The Version page: what RBlog runs, checking for a newer release, and its notice on the dashboard",
+                )
+                .area("integrations"),
+        )
         .permission_meta(
             ADMIN_GUARD,
             INTEGRATIONS_VIEW,

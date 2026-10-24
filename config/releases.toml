@@ -1,0 +1,8 @@
+# Release checks (Integrations → Version): RBlog asks GitHub for the releases of irisvn/RBlog every
+# 6 hours. That address is fixed in the code (services/version.rs).
+
+# Tests and development only: ask this releases list instead (a local server). Leave it empty;
+# the application refuses to boot with a value when APP_ENV=production.
+url = ""
+# The time limit of one check, in seconds (1–20).
+timeout_secs = 10

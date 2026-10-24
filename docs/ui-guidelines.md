@@ -236,6 +236,7 @@ with `sm` buttons. Its `aria-label` names the target ("Delete image cover.jpg").
 | Background job (import, export, mail) | Done | Queued, Running | Failed | — |
 | Media upload | Uploaded | Uploading, Processing | Failed | — |
 | API key (Content API) | Active | — | — | Expired |
+| RBlog version (Version page) | Up to date | Update available | — | Not checked, No release yet, Not compared |
 
 Raw values (enum names, error codes) stay available in a tooltip or a detail view, never as the
 badge. The mapping from server states to words lives in one place, `lib/status.ts`.

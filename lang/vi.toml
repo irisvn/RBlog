@@ -120,6 +120,18 @@
 "Manage Content API keys" = "Quản lý khoá Content API"
 "Create and revoke the keys the public site reads published content with" = "Tạo và thu hồi các khoá mà trang công khai dùng để đọc nội dung đã đăng"
 
+# The Version page (admin/pages/version_page.rs), its permission (`system.version`), and the
+# dashboard's notice of a newer release (admin/dashboard.rs, admin/resources/release_update_resource.rs).
+"Version" = "Phiên bản"
+"See the version and new releases" = "Xem phiên bản và bản phát hành mới"
+"The Version page: what RBlog runs, checking for a newer release, and its notice on the dashboard" = "Trang Phiên bản: RBlog đang chạy bản nào, kiểm tra bản mới, và thông báo trên trang tổng quan"
+"New RBlog release" = "Bản RBlog mới"
+"RBlog release" = "Bản phát hành RBlog"
+"RBlog releases" = "Bản phát hành RBlog"
+"Release notes" = "Ghi chú phát hành"
+"Release page" = "Trang phát hành"
+"The Version page says how to update." = "Trang Phiên bản có hướng dẫn cập nhật."
+
 # Author profiles (admin/resources/author_profile_resource.rs, services::authors) and the
 # read-only users list behind their user field (admin/resources/user_resource.rs).
 "Author" = "Tác giả"
@@ -242,3 +254,6 @@
 
 [page_revisions]
 "Body" = "Thân bài"
+
+[release_updates]
+"Published" = "Ngày phát hành"

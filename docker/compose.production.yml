@@ -1,0 +1,73 @@
+# RBlog in production with docker compose (docs/deployment.md): the release image and MySQL 8.4.
+# Copy this file to the server as compose.yml, with two files beside it (chmod 600):
+#
+#   .env, read by docker compose itself:
+#     RBLOG_VERSION=0.1.0          # the release to run (absent: latest)
+#     MYSQL_PASSWORD=…             # openssl rand -hex 24 (URL-safe: it goes into DATABASE_URL)
+#     MYSQL_ROOT_PASSWORD=…        # openssl rand -hex 24
+#   rblog.env, RBlog's own settings:
+#     APP_KEY=base64:…             # docker compose run --rm --no-deps rblog key:generate --show
+#     APP_URL=https://admin.example.com
+#
+# Then `docker compose up -d`. The container migrates the database when it starts (entrypoint.sh).
+# Updating: back up, set RBLOG_VERSION, `docker compose pull && docker compose up -d` (the admin's
+# Version page says the same).
+name: rblog
+
+services:
+  rblog:
+    image: ghcr.io/irisvn/rblog:${RBLOG_VERSION:-latest}
+    restart: unless-stopped
+    # APP_KEY, APP_URL, storage (RUSTCMS_STORAGE__…, AWS_…) and any RUSTCMS_<SECTION>__<KEY>.
+    env_file: rblog.env
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      DATABASE_URL: mysql://rblog:${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}@mysql:3306/rblog
+    depends_on:
+      mysql:
+        condition: service_healthy
+    # Only on this machine: a reverse proxy (Caddy, nginx, Traefik) serves it over https.
+    ports:
+      - "127.0.0.1:${RBLOG_PORT:-8000}:8000"
+    volumes:
+      # Uploaded media on the local disk (storage/app); keep it and back it up.
+      - rblog-storage:/app/storage
+    healthcheck:
+      # The image has no curl: bash asks /health itself.
+      test:
+        - CMD
+        - bash
+        - -c
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/8000
+          && printf 'GET /health HTTP/1.0\r\nHost: localhost\r\n\r\n' >&3
+          && head -n 1 <&3 | grep -q ' 200 '
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: rblog
+      MYSQL_USER: rblog
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
+    # RustCMS requires utf8mb4 / utf8mb4_0900_bin (it refuses to start otherwise).
+    command:
+      - "--character-set-server=utf8mb4"
+      - "--collation-server=utf8mb4_0900_bin"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  mysql-data:
+  rblog-storage:

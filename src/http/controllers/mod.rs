@@ -3,4 +3,5 @@
 pub mod content;
 pub mod content_keys;
 pub mod previews;
+pub mod version;
 // rustcms:controller-mods

@@ -2,6 +2,34 @@
 
 ## [Unreleased]
 
+### Version page and production docker compose
+
+- **Integrations → Version** (`/admin/p/version`, new permission `system.version`): what RBlog runs
+  (version, commit, build channel, image, RustCMS Core, MySQL, OS and architecture, start time),
+  the last release check (when, "up to date" or "RBlog X.Y.Z is available", why it failed), the
+  newer release's notes as plain text, and how to update with docker compose (back up, set
+  `RBLOG_VERSION`, pull and restart, roll back). RBlog never updates itself.
+- Release checks ask GitHub's releases of `irisvn/RBlog` (fixed address, anonymous, a
+  `rblog/<version>` user agent only, 10 s, 4 MiB at most) every 6 hours (schedule
+  `release-check`) and on "Check now" (at most once a minute: 429 with `Retry-After`), and keep the
+  newest non-draft, non-prerelease `vX.Y.Z` release in the new table `release_checks` (run
+  `rblog migrate`; the migration only adds a table). `rblog version:check` checks from the
+  command line. `config/releases.toml` (`[releases]`): `url` for tests only (refused in
+  production), `timeout_secs` (1–20).
+- Only release builds are compared: `build.rs` reads `RBLOG_VERSION` and `RBLOG_COMMIT`, which
+  `.github/workflows/release.yml` now passes to `cargo build`. Local builds are `source`, CI builds
+  `development`: both show the newest release but are never told to update.
+- **Dashboard**: holders of `system.version` see the widget "New RBlog release" (empty while up to
+  date). RustCMS 0.10.3 has no dashboard slot, so it is a widget over a read-only resource,
+  `release_updates`; its own permissions (`release_updates.*`) grant nothing.
+- **Existing installs**: `permission:sync` (the image's entrypoint runs it) adds `system.version`,
+  but the Administrator role made earlier does not get it: tick it on the Roles page (super admins
+  have it anyway).
+- **Production**: `docker/compose.production.yml` (the release image and MySQL 8.4 with
+  `utf8mb4_0900_bin`, volumes for MySQL and `storage/`, a `/health` healthcheck) and
+  [docs/deployment.md](docs/deployment.md) (first install, environment, updating, backups,
+  rollback).
+
 ### RustCMS 0.10.3: page headers on phones
 
 - RustCMS-Core v0.10.3 (no migration, no API change).
